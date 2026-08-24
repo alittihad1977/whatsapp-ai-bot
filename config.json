@@ -4,7 +4,9 @@
     "enabled": true
   },
   "permissions": {
-    "allowedUsers": [],
+    "allowedUsers": [
+      "test-user-1"
+    ],
     "allowedGroups": [],
     "groupOnlyWhenMentioned": true
   },
