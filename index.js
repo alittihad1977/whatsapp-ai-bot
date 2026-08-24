@@ -10,162 +10,212 @@ app.use(express.urlencoded({ extended: true }));
 // الصفحة الرئيسية
 app.get("/", (req, res) => {
   res.send(`
-    <!DOCTYPE html>
-    <html lang="ar" dir="rtl">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>اختبار صلاحيات البوت</title>
-      <style>
-        body {
-          font-family: Arial, sans-serif;
-          max-width: 600px;
-          margin: 40px auto;
-          padding: 20px;
-          background: #f5f5f5;
-        }
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-        .box {
-          background: white;
-          padding: 20px;
-          border-radius: 15px;
-          box-shadow: 0 3px 15px rgba(0,0,0,.1);
-        }
+<title>مساعد شركة الاتحاد</title>
 
-        h1 {
-          margin-top: 0;
-        }
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: #f3f4f6;
+  margin: 0;
+  padding: 20px;
+}
 
-        input, select, button {
-          width: 100%;
-          padding: 12px;
-          margin-top: 8px;
-          margin-bottom: 15px;
-          box-sizing: border-box;
-          border-radius: 8px;
-          border: 1px solid #ccc;
-          font-size: 16px;
-        }
+.container {
+  max-width: 600px;
+  margin: auto;
+}
 
-        button {
-          background: #222;
-          color: white;
-          cursor: pointer;
-          border: none;
-        }
+.card {
+  background: white;
+  padding: 20px;
+  border-radius: 15px;
+  box-shadow: 0 4px 15px rgba(0,0,0,.08);
+}
 
-        button:hover {
-          opacity: .9;
-        }
+h1 {
+  margin-top: 0;
+}
 
-        #result {
-          padding: 15px;
-          border-radius: 10px;
-          margin-top: 15px;
-          display: none;
-        }
+label {
+  display: block;
+  margin-top: 15px;
+  font-weight: bold;
+}
 
-        .allowed {
-          background: #dff6e4;
-          color: #176b2c;
-        }
+input,
+select,
+button {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px;
+  margin-top: 7px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  font-size: 16px;
+}
 
-        .denied {
-          background: #ffe1e1;
-          color: #9b1c1c;
-        }
-      </style>
-    </head>
+button {
+  margin-top: 20px;
+  background: #222;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
 
-    <body>
+button:hover {
+  opacity: .9;
+}
 
-      <div class="box">
+#result {
+  display: none;
+  margin-top: 20px;
+  padding: 15px;
+  border-radius: 10px;
+}
 
-        <h1>🤖 اختبار صلاحيات البوت</h1>
+.allowed {
+  background: #d9f7df;
+  color: #176b2c;
+}
 
-        <p>
-          شركة الاتحاد للصرافة والحوالات
-        </p>
+.denied {
+  background: #ffe0e0;
+  color: #9b1c1c;
+}
+</style>
+</head>
 
-        <label>نوع المحادثة</label>
+<body>
 
-        <select id="chatType">
-          <option value="user">👤 شخص</option>
-          <option value="group">👥 مجموعة</option>
-        </select>
+<div class="container">
 
-        <label>المعرّف</label>
+<div class="card">
 
-        <input
-          id="chatId"
-          type="text"
-          placeholder="مثال: 9639XXXXXXXX"
-        >
+<h1>🤖 مساعد شركة الاتحاد</h1>
 
-        <label>نص الرسالة</label>
+<p>
+اختبار صلاحيات الرد
+</p>
 
-        <input
-          id="message"
-          type="text"
-          placeholder="مثال: قديش سعر الدولار؟"
-        >
+<label>نوع المحادثة</label>
 
-        <button onclick="testPermission()">
-          🔍 اختبار الصلاحية
-        </button>
+<select id="chatType">
+<option value="user">👤 شخص</option>
+<option value="group">👥 مجموعة</option>
+</select>
 
-        <div id="result"></div>
+<label>المعرّف</label>
 
-      </div>
+<input
+id="chatId"
+type="text"
+placeholder="اكتب المعرّف هنا"
+>
 
-      <script>
-        async function testPermission() {
+<label>نص الرسالة</label>
 
-          const chatType = document.getElementById("chatType").value;
-          const chatId = document.getElementById("chatId").value.trim();
-          const message = document.getElementById("message").value.trim();
+<input
+id="message"
+type="text"
+placeholder="مثال: قديش سعر الدولار؟"
+>
 
-          const result = document.getElementById("result");
+<button onclick="testPermission()">
+🔍 اختبار الصلاحية
+</button>
 
-          if (!chatId) {
-            result.style.display = "block";
-            result.className = "denied";
-            result.innerText = "❌ اكتب المعرّف أولاً";
-            return;
-          }
+<div id="result"></div>
 
-          const response = await fetch("/test-permission", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              chatType,
-              chatId,
-              message
-            })
-          });
+</div>
 
-          const data = await response.json();
+</div>
 
-          result.style.display = "block";
+<script>
 
-          if (data.allowed) {
-            result.className = "allowed";
-            result.innerHTML =
-              "✅ مسموح للبوت بالرد<br><br>" +
-              "السبب: " + data.reason;
-          } else {
-            result.className = "denied";
-            result.innerHTML =
-              "🚫 غير مسموح للبوت بالرد<br><br>" +
-              "السبب: " + data.reason;
-          }
-        }
-      </script>
+async function testPermission() {
 
-    </body>
-    </html>
+const chatType =
+document.getElementById("chatType").value;
+
+const chatId =
+document.getElementById("chatId").value.trim();
+
+const message =
+document.getElementById("message").value.trim();
+
+const result =
+document.getElementById("result");
+
+if (!chatId) {
+
+result.style.display = "block";
+result.className = "denied";
+result.innerText = "❌ اكتب المعرّف أولاً";
+
+return;
+}
+
+try {
+
+const response = await fetch(
+"/test-permission",
+{
+method: "POST",
+headers: {
+"Content-Type": "application/json"
+},
+body: JSON.stringify({
+chatType: chatType,
+chatId: chatId,
+message: message
+})
+}
+);
+
+const data = await response.json();
+
+result.style.display = "block";
+
+if (data.allowed) {
+
+result.className = "allowed";
+
+result.innerHTML =
+"✅ مسموح للبوت بالرد<br><br>" +
+"السبب: " + data.reason;
+
+} else {
+
+result.className = "denied";
+
+result.innerHTML =
+"🚫 غير مسموح للبوت بالرد<br><br>" +
+"السبب: " + data.reason;
+
+}
+
+} catch (error) {
+
+result.style.display = "block";
+result.className = "denied";
+
+result.innerText =
+"❌ حدث خطأ في الاتصال بالسيرفر";
+
+}
+
+}
+
+</script>
+
+</body>
+</html>
   `);
 }
 
@@ -173,90 +223,103 @@ app.get("/", (req, res) => {
 // اختبار الصلاحيات
 app.post("/test-permission", (req, res) => {
 
-  const {
-    chatType,
-    chatId,
-    message
-  } = req.body;
-
-  let allowed = false;
-  let reason = "";
+  const chatType = req.body.chatType;
+  const chatId = req.body.chatId;
+  const message = req.body.message || "";
 
   if (!chatId) {
+
     return res.json({
       allowed: false,
       reason: "المعرّف فارغ"
     });
+
   }
 
-  // شخص
+
+  // فحص الأشخاص
   if (chatType === "user") {
 
     if (config.permissions.allowedUsers.includes(chatId)) {
 
-      allowed = true;
-      reason = "المستخدم موجود ضمن قائمة الأشخاص المسموح لهم";
+      return res.json({
+        allowed: true,
+        reason: "الشخص موجود ضمن قائمة المسموح لهم"
+      });
 
-    } else {
-
-      reason = "المستخدم غير موجود ضمن قائمة الأشخاص المسموح لهم";
     }
+
+    return res.json({
+      allowed: false,
+      reason: "الشخص غير موجود ضمن قائمة المسموح لهم"
+    });
+
   }
 
 
-  // مجموعة
+  // فحص المجموعات
   if (chatType === "group") {
 
     if (config.permissions.allowedGroups.includes(chatId)) {
 
-      allowed = true;
-      reason = "المجموعة موجودة ضمن قائمة المجموعات المسموح بها";
+      return res.json({
+        allowed: true,
+        reason: "المجموعة موجودة ضمن قائمة المجموعات المسموح بها"
+      });
 
-    } else {
-
-      reason = "المجموعة غير موجودة ضمن قائمة المجموعات المسموح بها";
     }
+
+    return res.json({
+      allowed: false,
+      reason: "المجموعة غير موجودة ضمن قائمة المجموعات المسموح بها"
+    });
+
   }
 
 
-  console.log({
-    chatType,
-    chatId,
-    message,
-    allowed
-  });
-
-
-  res.json({
-    allowed,
-    reason
+  return res.json({
+    allowed: false,
+    reason: "نوع المحادثة غير معروف"
   });
 
 });
 
 
-// معلومات الحالة
+// حالة البوت
 app.get("/status", (req, res) => {
 
   res.json({
+
     status: "online",
+
     bot: config.bot.name,
+
     enabled: config.bot.enabled,
 
     company: config.company.name,
+
     branch: config.company.branch,
 
     workingHours: config.company.workingHours,
+
     holiday: config.company.holiday,
 
-    allowedUsers: config.permissions.allowedUsers.length,
-    allowedGroups: config.permissions.allowedGroups.length
+    allowedUsers:
+      config.permissions.allowedUsers.length,
+
+    allowedGroups:
+      config.permissions.allowedGroups.length
 
   });
 
 });
 
 
+// تشغيل السيرفر
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+
+  console.log(
+    `Server running on port ${PORT}`
+  );
+
 });
