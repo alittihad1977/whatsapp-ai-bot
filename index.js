@@ -43,7 +43,7 @@ const COMPANY = {
 
 
 // ======================================================
-// عطلة المولد النبوي - مؤقتة
+// العطلة الرسمية الحالية
 // ======================================================
 
 const SPECIAL_HOLIDAY = {
@@ -55,16 +55,18 @@ const SPECIAL_HOLIDAY = {
 
 
 // ======================================================
-// أدوات مساعدة
+// أدوات النص
 // ======================================================
 
 function normalizeText(text) {
+
   return String(text || "")
     .toLowerCase()
     .trim()
     .replace(/[إأآ]/g, "ا")
     .replace(/ة/g, "ه")
     .replace(/ى/g, "ي")
+    .replace(/[ًٌٍَُِّْ]/g, "")
     .replace(/\s+/g, " ");
 }
 
@@ -103,512 +105,24 @@ function isAllowedGroup(chatId) {
 
 
 // ======================================================
-// الردود الثابتة
+// AI ROUTER
 // ======================================================
 
-function getReplyByIntent(intent) {
+function routeMessage(message) {
 
-  switch (intent) {
+  const text = normalizeText(message);
 
-    // --------------------------------------------------
-    // تحية
-    // --------------------------------------------------
-
-    case "greeting":
-
-      return {
-        reply:
-          "أهلاً وسهلاً بك 🌹 كيف يمكنني مساعدتك؟",
-        type: "greeting"
-      };
-
-
-    // --------------------------------------------------
-    // شكر
-    // --------------------------------------------------
-
-    case "thanks":
-
-      return {
-        reply:
-          "العفو 🌹 أهلاً وسهلاً بك دائماً.",
-        type: "thanks"
-      };
-
-
-    // --------------------------------------------------
-    // الموقع
-    // --------------------------------------------------
-
-    case "location":
-
-      return {
-        reply:
-          "📍 موقع مكتب الشعار:\n" +
-          COMPANY.address +
-          "\n\n🗺️ الخريطة:\n" +
-          COMPANY.map,
-        type: "location"
-      };
-
-
-    // --------------------------------------------------
-    // الفروع
-    // --------------------------------------------------
-
-    case "branches":
-
-      return {
-        reply:
-          "🏢 أفرع شركة الاتحاد:\n\n" +
-          "1- " +
-          COMPANY.branches[0] +
-          "\n" +
-          "2- " +
-          COMPANY.branches[1] +
-          "\n\n" +
-          COMPANY.mainBranch,
-        type: "branches"
-      };
-
-
-    // --------------------------------------------------
-    // الدوام
-    // --------------------------------------------------
-
-    case "working_hours":
-
-      return {
-        reply:
-          "⏱️ " +
-          SPECIAL_HOLIDAY.text,
-        type: "special_holiday"
-      };
-
-
-    // --------------------------------------------------
-    // الأسعار
-    // --------------------------------------------------
-
-    case "rates":
-
-      return {
-        reply:
-          "💰 لمعرفة أسعار الصرف الحالية، يمكنك متابعة قنوات الأسعار الرسمية لشركة الاتحاد:\n\n" +
-          "Telegram:\n" +
-          COMPANY.telegram +
-          "\n\n" +
-          "WhatsApp:\n" +
-          COMPANY.whatsapp,
-        type: "rates"
-      };
-
-
-    // --------------------------------------------------
-    // استعلام عن حوالة
-    // --------------------------------------------------
-
-    case "transfer_check":
-
-      return {
-        reply:
-          "📋 يرجى إرسال إشعار الحوالة، وسيقوم القسم المختص بالتحقق منه والرد عليك بأسرع وقت.",
-        type: "transfer_check"
-      };
-
-
-    // --------------------------------------------------
-    // إشعار حوالة
-    // --------------------------------------------------
-
-    case "transfer_notice":
-
-      return {
-        reply:
-          "📋 تم استلام المعلومات، وسيقوم القسم المختص بالتحقق منها والرد عليك بأسرع وقت.",
-        type: "transfer_notice"
-      };
-
-
-    // --------------------------------------------------
-    // الوثائق
-    // --------------------------------------------------
-
-    case "documents":
-
-      return {
-        reply:
-          "🪪 لاستلام الحوالة يجب إبراز إحدى الوثائق الأصلية التالية حصراً:\n\n" +
-          "• الهوية الشخصية الأصلية.\n" +
-          "• جواز السفر الأصلي.\n" +
-          "• إخراج القيد الأصلي.\n\n" +
-          "⚠️ صور الوثائق على الهاتف غير مقبولة نهائياً.",
-        type: "documents"
-      };
-
-
-    // --------------------------------------------------
-    // شام كاش
-    // --------------------------------------------------
-
-    case "sham_cash":
-
-      return {
-        reply:
-          "نعتذر منك 🌹 لا يوجد لدينا تعامل أو تسليم حوالات عن طريق شام كاش.",
-        type: "sham_cash"
-      };
-
-
-    // --------------------------------------------------
-    // شخص آخر يستلم
-    // --------------------------------------------------
-
-    case "receiver_change":
-
-      return {
-        reply:
-          "📋 تسليم الحوالة يكون باليد لصاحب العلاقة حصراً.\n\n" +
-          "إذا كنت لا تستطيع الحضور، يمكنك الاستفسار عن إمكانية تعديل اسم الحوالة إلى شخص آخر يستطيع الحضور والاستلام، ويجب أن يكون التعديل على اسم الشخص الذي سيحضر ويستلم.",
-        type: "receiver_change"
-      };
-
-
-    // --------------------------------------------------
-    // استلام في يوم آخر
-    // --------------------------------------------------
-
-    case "later_collection":
-
-      return {
-        reply:
-          "📋 تبقى الحوالة موجودة حتى يأتي صاحب العلاقة ليستلمها، أو يمكن للمرسل استعادة المبلغ.",
-        type: "later_collection"
-      };
-
-
-    // --------------------------------------------------
-    // شكوى
-    // --------------------------------------------------
-
-    case "complaint":
-
-      return {
-        reply:
-          "🌹 أكيد، اشرح لنا المشكلة بالتفصيل كتابةً، ليتم رفعها ومتابعتها مع المختص.",
-        type: "complaint"
-      };
-
-
-    // --------------------------------------------------
-    // رسالة صوتية
-    // --------------------------------------------------
-
-    case "voice":
-
-      return {
-        reply:
-          "🌹 عذراً، يرجى كتابة استفسارك نصياً حتى أتمكن من مساعدتك.",
-        type: "voice"
-      };
-
-
-    // --------------------------------------------------
-    // غير معروف
-    // --------------------------------------------------
-
-    default:
-
-      return {
-        reply:
-          "🌹 أهلاً بك.\n" +
-          "يرجى توضيح استفسارك كتابةً حتى نتمكن من مساعدتك.",
-        type: "unknown"
-      };
-
-  }
-}
-
-
-// ======================================================
-// AI ROUTER - Gemini
-// ======================================================
-
-async function aiRouter(message) {
-
-  const apiKey = process.env.GEMINI_API_KEY;
-
-  if (!apiKey) {
-
-    console.log("GEMINI_API_KEY غير موجود");
-
+  if (!text) {
     return {
-      intent: null,
-      confidence: 0,
-      source: "fallback"
+      intent: "greeting",
+      confidence: "high"
     };
-
   }
 
 
-  const prompt = `
-أنت AI Router لخدمة عملاء شركة صرافة وحوالات.
-
-مهمتك الوحيدة هي فهم رسالة العميل وتصنيفها.
-
-ممنوع عليك الإجابة عن العميل.
-ممنوع اختراع معلومات.
-ممنوع إعطاء أسعار.
-ممنوع إعطاء معلومات غير موجودة.
-
-أعد JSON فقط بهذا الشكل:
-
-{
-  "intent": "اسم التصنيف",
-  "confidence": 0.0
-}
-
-التصنيفات المسموحة فقط:
-
-greeting
-thanks
-location
-branches
-working_hours
-rates
-transfer_check
-transfer_notice
-documents
-sham_cash
-receiver_change
-later_collection
-complaint
-voice
-unknown
-
-أمثلة:
-
-"مرحبا"
-=> greeting
-
-"عنكن فرع تاني؟"
-=> branches
-
-"في غير فرع الشعار؟"
-=> branches
-
-"وين فروعكم"
-=> branches
-
-"وين محلكن"
-=> location
-
-"وين مكتبكن"
-=> location
-
-"فاتحين اليوم؟"
-=> working_hours
-
-"امتى بتفتحو"
-=> working_hours
-
-"قديش الدولار"
-=> rates
-
-"شو سعر اليورو"
-=> rates
-
-"في حوالة باسمي؟"
-=> transfer_check
-
-"وصلتني الحوالة؟"
-=> transfer_check
-
-"شو لازم جيب معي لاستلم"
-=> documents
-
-"معي صورة هوية بتمشي؟"
-=> documents
-
-"بتتعاملوا بشام كاش؟"
-=> sham_cash
-
-"اخوي يستلم عني"
-=> receiver_change
-
-"بدي خلي شخص تاني يستلم"
-=> receiver_change
-
-"بقدر استلم الحوالة بكرا؟"
-=> later_collection
-
-"بدي اشتكي"
-=> complaint
-
-"عندي مشكلة مع الفرع"
-=> complaint
-
-رسالة العميل:
-
-${message}
-`;
-
-
-  try {
-
-    const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=" +
-        encodeURIComponent(apiKey),
-      {
-
-        method: "POST",
-
-        headers: {
-          "Content-Type": "application/json"
-        },
-
-        body: JSON.stringify({
-
-          contents: [
-            {
-              parts: [
-                {
-                  text: prompt
-                }
-              ]
-            }
-          ],
-
-          generationConfig: {
-            temperature: 0,
-            responseMimeType: "application/json"
-          }
-
-        })
-
-      }
-    );
-
-
-    if (!response.ok) {
-
-      const errorText =
-        await response.text();
-
-      console.log(
-        "Gemini error:",
-        response.status,
-        errorText
-      );
-
-      return {
-        intent: null,
-        confidence: 0,
-        source: "fallback"
-      };
-
-    }
-
-
-    const data =
-      await response.json();
-
-
-    const text =
-      data &&
-      data.candidates &&
-      data.candidates[0] &&
-      data.candidates[0].content &&
-      data.candidates[0].content.parts &&
-      data.candidates[0].content.parts[0] &&
-      data.candidates[0].content.parts[0].text;
-
-
-    if (!text) {
-
-      return {
-        intent: null,
-        confidence: 0,
-        source: "fallback"
-      };
-
-    }
-
-
-    const parsed =
-      JSON.parse(text);
-
-
-    const allowedIntents = [
-      "greeting",
-      "thanks",
-      "location",
-      "branches",
-      "working_hours",
-      "rates",
-      "transfer_check",
-      "transfer_notice",
-      "documents",
-      "sham_cash",
-      "receiver_change",
-      "later_collection",
-      "complaint",
-      "voice",
-      "unknown"
-    ];
-
-
-    if (
-      !allowedIntents.includes(
-        parsed.intent
-      )
-    ) {
-
-      return {
-        intent: null,
-        confidence: 0,
-        source: "fallback"
-      };
-
-    }
-
-
-    return {
-      intent: parsed.intent,
-      confidence:
-        Number(parsed.confidence) || 0,
-      source: "gemini"
-    };
-
-  }
-
-  catch (error) {
-
-    console.log(
-      "Gemini Router Error:",
-      error.message
-    );
-
-    return {
-      intent: null,
-      confidence: 0,
-      source: "fallback"
-    };
-
-  }
-
-}
-
-
-// ======================================================
-// النظام القديم كـ Fallback
-// ======================================================
-
-function fallbackRouter(message) {
-
-  const text =
-    normalizeText(message);
-
+  // ====================================================
+  // تحية
+  // ====================================================
 
   if (
     containsAny(text, [
@@ -620,122 +134,301 @@ function fallbackRouter(message) {
       "هاي",
       "هلا",
       "مسا الخير",
-      "صباح الخير",
-      "مساء الخير"
+      "مساء الخير",
+      "صباح الخير"
     ])
   ) {
-    return "greeting";
+    return {
+      intent: "greeting",
+      confidence: "high"
+    };
   }
 
+
+  // ====================================================
+  // شكر
+  // ====================================================
 
   if (
     containsAny(text, [
       "شكرا",
-      "شكراً",
       "يسلمو",
       "مشكور",
-      "مشكورين"
+      "مشكورين",
+      "يعطيكم العافيه",
+      "يعطيكم العافية",
+      "تسلم",
+      "تسلمو"
     ])
   ) {
-    return "thanks";
+    return {
+      intent: "thanks",
+      confidence: "high"
+    };
   }
 
+
+  // ====================================================
+  // الفروع
+  // ====================================================
+
+  if (
+    containsAny(text, [
+      "فروعكن",
+      "فروعكم",
+      "فروع الشركة",
+      "فروع",
+      "فرعكن",
+      "فرعكم",
+      "افرع",
+      "أفرع",
+
+      "فرع تاني",
+      "فرع ثاني",
+      "فروع تانيه",
+      "فروع ثانية",
+      "في فرع تاني",
+      "في فرع ثاني",
+
+      "عنكن فرع",
+      "عندكن فرع",
+      "عندكم فرع",
+      "في عندكن فرع",
+      "في عندكم فرع",
+
+      "مكاتب تانيه",
+      "مكاتب ثانية",
+      "مكتب تاني",
+      "مكتب ثاني",
+
+      "وين فروعكن",
+      "وين فروعكم",
+      "وين افرعكن",
+      "وين فروع الشركة"
+    ])
+  ) {
+    return {
+      intent: "branches",
+      confidence: "high"
+    };
+  }
+
+
+  // ====================================================
+  // الموقع
+  // ====================================================
 
   if (
     containsAny(text, [
       "محلكن",
       "محلكم",
+      "محل الشركة",
       "وين محلكن",
+      "وين محلكم",
+      "وين المحل",
+      "وين محلك",
       "وين المكتب",
       "عنوان",
       "العنوان",
       "العنون",
       "عنون",
       "عنوانكن",
+      "عنوانكم",
       "وينكن",
+      "وينكم",
       "موقعكن",
-      "الموقع"
+      "موقعكم",
+      "الموقع",
+      "مكانكن",
+      "مكانكم",
+      "وين موجودين"
     ])
   ) {
-    return "location";
+    return {
+      intent: "location",
+      confidence: "high"
+    };
   }
 
 
-  if (
-    containsAny(text, [
-      "فرع",
-      "فروع",
-      "فرعكن",
-      "فروعكن",
-      "فروعكم",
-      "افرع",
-      "أفرع"
-    ])
-  ) {
-    return "branches";
-  }
-
+  // ====================================================
+  // الدوام
+  // ====================================================
 
   if (
     containsAny(text, [
       "فاتحين",
       "فاتح",
+      "مفتوح",
+      "مفتوحين",
       "تفتحو",
       "تفتحوا",
+      "المكتب فاتح",
+      "مكتب فاتح",
       "مسكرين",
       "مسكر",
       "تسكرو",
       "تسكروا",
       "بتسكرو",
-      "دوام"
+      "دوام",
+      "اوقات الدوام",
+      "وقت الدوام",
+      "متى تفتحون",
+      "امتا بتفتحو",
+      "ايمت بتفتحو",
+      "شو وقت الدوام",
+      "اي ساعة بتفتحو",
+      "اي ساعه بتفتحو",
+      "اي ساعة بتسكرو",
+      "اي ساعه بتسكرو"
     ])
   ) {
-    return "working_hours";
+    return {
+      intent: "working_hours",
+      confidence: "high"
+    };
   }
 
 
+  // ====================================================
+  // أسعار الصرف
+  // ====================================================
+
   if (
     containsAny(text, [
-      "سعر",
-      "اسعار",
-      "أسعار",
-      "صرف",
-      "دولار",
-      "يورو",
-      "تركي"
+      "سعر الدولار",
+      "سعر اليورو",
+      "سعر التركي",
+      "سعر الليرة",
+      "اسعار الصرف",
+      "أسعار الصرف",
+      "سعر الصرف",
+      "صرف الدولار",
+      "صرف اليورو",
+      "سعر العمله",
+      "سعر العملة",
+      "الدولار اليوم",
+      "اليورو اليوم",
+      "التركي اليوم",
+      "قديش الدولار",
+      "قديش اليورو",
+      "قديش التركي",
+      "كم الدولار",
+      "كم اليورو",
+      "كم التركي",
+      "بكم الدولار",
+      "بكم اليورو",
+      "بكم التركي",
+      "سعر usd",
+      "سعر eur",
+      "سعر try"
     ])
   ) {
-    return "rates";
+    return {
+      intent: "rates",
+      confidence: "high"
+    };
   }
 
 
+  // ====================================================
+  // حوالة / استعلام
+  // ====================================================
+
   if (
     containsAny(text, [
-      "حواله",
-      "حوالة",
-      "وصلتني",
+      "حواله باسمي",
+      "حوالة باسمي",
+      "في حواله",
+      "في حوالة",
+      "في حوالة باسمي",
       "وصلت الحواله",
-      "وصلت الحوالة"
+      "وصلت الحوالة",
+      "وصلتني حواله",
+      "وصلتني حوالة",
+      "وين الحواله",
+      "وين الحوالة",
+      "استلم حواله",
+      "استلم حوالة",
+      "استلام حواله",
+      "استلام حوالة",
+      "بدي استلم حواله",
+      "بدي استلم حوالة",
+      "عندي حواله",
+      "عندي حوالة",
+      "الي حواله",
+      "الي حوالة",
+      "في شي حواله",
+      "في شي حوالة"
     ])
   ) {
-    return "transfer_check";
+    return {
+      intent: "transfer_check",
+      confidence: "high"
+    };
   }
 
 
+  // ====================================================
+  // إشعار حوالة / رقم حوالة
+  // ====================================================
+
   if (
     containsAny(text, [
+      "اشعار حواله",
+      "اشعار حوالة",
+      "إشعار حوالة",
+      "إشعار الحوالة",
+      "رقم الحواله",
+      "رقم الحوالة",
+      "#000",
+      "#31",
+      "شركة الاتحاد"
+    ])
+  ) {
+    return {
+      intent: "transfer_notice",
+      confidence: "medium"
+    };
+  }
+
+
+  // ====================================================
+  // الوثائق
+  // ====================================================
+
+  if (
+    containsAny(text, [
+      "شو بدي جيب",
+      "شو لازم جيب",
+      "شو لازم معي",
+      "الاوراق",
+      "الأوراق",
+      "وثيقه",
+      "وثيقة",
       "هويه",
       "هوية",
       "جواز",
-      "وثيقه",
-      "وثيقة",
       "اخراج قيد",
-      "إخراج قيد"
+      "إخراج قيد",
+      "صوره الهويه",
+      "صورة الهوية",
+      "شو بدي لاستلم",
+      "شو لازم لاستلم",
+      "شو بدي معي للحواله",
+      "شو بدي معي للحوالة"
     ])
   ) {
-    return "documents";
+    return {
+      intent: "documents",
+      confidence: "high"
+    };
   }
 
+
+  // ====================================================
+  // شام كاش
+  // ====================================================
 
   if (
     containsAny(text, [
@@ -744,109 +437,347 @@ function fallbackRouter(message) {
       "sham cash"
     ])
   ) {
-    return "sham_cash";
+    return {
+      intent: "sham_cash",
+      confidence: "high"
+    };
   }
 
+
+  // ====================================================
+  // شخص آخر يستلم
+  // ====================================================
 
   if (
     containsAny(text, [
-      "يستلم عني",
+      "حدا يستلم عني",
+      "شخص يستلم عني",
+      "اخي يستلم",
+      "اخوي يستلم",
+      "زوجتي تستلم",
+      "زوجي يستلم",
+      "ابي يستلم",
+      "ابوي يستلم",
+      "امي تستلم",
+      "حدا غيري يستلم",
       "غيري يستلم",
-      "شخص يستلم"
+      "بدي حدا يستلم",
+      "في حدا يستلم عني",
+      "ممكن حدا يستلم",
+      "ينفع حدا يستلم"
     ])
   ) {
-    return "receiver_change";
+    return {
+      intent: "receiver_change",
+      confidence: "high"
+    };
   }
 
+
+  // ====================================================
+  // استلام يوم آخر
+  // ====================================================
 
   if (
     containsAny(text, [
       "بكرا استلم",
-      "بعدین استلم",
-      "بعدين استلم",
+      "باجر استلم",
       "يوم تاني",
-      "يوم ثاني"
+      "يوم ثاني",
+      "بقدر استلم بعدين",
+      "استلمها بعدين",
+      "استلمها يوم اخر",
+      "استلمها يوم آخر",
+      "بدي اجي بعدين",
+      "بقدر اجي بكرا",
+      "بقدر اجي بعدين",
+      "اذا ما جيت اليوم"
     ])
   ) {
-    return "later_collection";
+    return {
+      intent: "later_collection",
+      confidence: "high"
+    };
   }
 
+
+  // ====================================================
+  // شكوى / إدارة
+  // ====================================================
 
   if (
     containsAny(text, [
       "شكوى",
       "شكايه",
+      "شكاية",
       "مشكله",
       "مشكلة",
-      "اشتكي",
       "الاداره",
-      "الإدارة"
+      "الإدارة",
+      "المدير",
+      "بدي اشتكي",
+      "بدي احكي مع الاداره",
+      "بدي احكي مع الإدارة",
+      "وين المدير",
+      "بدي مسؤول"
     ])
   ) {
-    return "complaint";
+    return {
+      intent: "complaint",
+      confidence: "high"
+    };
   }
 
 
-  return "unknown";
-}
-
-
-// ======================================================
-// توليد الرد النهائي
-// ======================================================
-
-async function generateReply(message) {
-
-  // أولاً نجرب AI
-  const ai =
-    await aiRouter(message);
-
+  // ====================================================
+  // رسالة صوتية
+  // ====================================================
 
   if (
-    ai.intent &&
-    ai.confidence >= 0.55
+    containsAny(text, [
+      "[voice]",
+      "[audio]",
+      "رساله صوتيه",
+      "رسالة صوتية"
+    ])
   ) {
-
-    const result =
-      getReplyByIntent(ai.intent);
-
-
     return {
-      ...result,
-      router: "gemini",
-      confidence: ai.confidence
+      intent: "voice",
+      confidence: "high"
     };
-
   }
 
 
-  // إذا فشل AI نستخدم النظام القديم
-  const fallbackIntent =
-    fallbackRouter(message);
-
-
-  const result =
-    getReplyByIntent(fallbackIntent);
-
+  // ====================================================
+  // غير معروف
+  // ====================================================
 
   return {
-    ...result,
-    router: "fallback",
-    confidence: 0
+    intent: "unknown",
+    confidence: "low"
   };
-
 }
 
 
 // ======================================================
-// الصفحة الرئيسية - واجهة الاختبار
+// توليد الرد بناءً على Intent
+// ======================================================
+
+function generateReply(message) {
+
+  const route = routeMessage(message);
+
+  switch (route.intent) {
+
+    case "greeting":
+
+      return {
+        reply:
+          "أهلاً وسهلاً بك 🌹 كيف يمكنني مساعدتك؟",
+        type: "greeting",
+        intent: route.intent,
+        confidence: route.confidence
+      };
+
+
+    case "thanks":
+
+      return {
+        reply:
+          "العفو 🌹 أهلاً وسهلاً بك دائماً.",
+        type: "thanks",
+        intent: route.intent,
+        confidence: route.confidence
+      };
+
+
+    case "branches":
+
+      return {
+        reply:
+          "🏢 أفرع شركة الاتحاد:\n\n" +
+          "1- " + COMPANY.branches[0] + "\n" +
+          "2- " + COMPANY.branches[1] + "\n\n" +
+          COMPANY.mainBranch,
+        type: "branches",
+        intent: route.intent,
+        confidence: route.confidence
+      };
+
+
+    case "location":
+
+      return {
+        reply:
+          "📍 موقع مكتب الشعار:\n" +
+          COMPANY.address +
+          "\n\n🗺️ الخريطة:\n" +
+          COMPANY.map,
+        type: "location",
+        intent: route.intent,
+        confidence: route.confidence
+      };
+
+
+    case "working_hours": {
+
+      const today =
+        new Date()
+          .toISOString()
+          .slice(0, 10);
+
+      if (today === SPECIAL_HOLIDAY.date) {
+
+        return {
+          reply:
+            "⏱️ " + SPECIAL_HOLIDAY.text,
+          type: "special_holiday",
+          intent: route.intent,
+          confidence: route.confidence
+        };
+      }
+
+      return {
+        reply:
+          "⏱️ الدوام من 10 صباحاً حتى 6 مساءً.\n" +
+          "والجمعة عطلة رسمية.",
+        type: "working_hours",
+        intent: route.intent,
+        confidence: route.confidence
+      };
+    }
+
+
+    case "rates":
+
+      return {
+        reply:
+          "💰 لمعرفة أسعار الصرف الحالية، يمكنك متابعة قنوات الأسعار الرسمية لشركة الاتحاد:\n\n" +
+          "Telegram:\n" +
+          COMPANY.telegram +
+          "\n\n" +
+          "WhatsApp:\n" +
+          COMPANY.whatsapp,
+        type: "rates",
+        intent: route.intent,
+        confidence: route.confidence
+      };
+
+
+    case "transfer_check":
+
+      return {
+        reply:
+          "📋 يرجى إرسال إشعار الحوالة، وسيقوم القسم المختص بالتحقق منه والرد عليك بأسرع وقت.",
+        type: "transfer_check",
+        intent: route.intent,
+        confidence: route.confidence
+      };
+
+
+    case "transfer_notice":
+
+      return {
+        reply:
+          "📋 تم استلام المعلومات، وسيقوم القسم المختص بالتحقق منها والرد عليك بأسرع وقت.",
+        type: "transfer_notice",
+        intent: route.intent,
+        confidence: route.confidence
+      };
+
+
+    case "documents":
+
+      return {
+        reply:
+          "🪪 لاستلام الحوالة يجب إبراز إحدى الوثائق الأصلية التالية حصراً:\n\n" +
+          "• الهوية الشخصية الأصلية.\n" +
+          "• جواز السفر الأصلي.\n" +
+          "• إخراج القيد الأصلي.\n\n" +
+          "⚠️ صور الوثائق على الهاتف غير مقبولة نهائياً.",
+        type: "documents",
+        intent: route.intent,
+        confidence: route.confidence
+      };
+
+
+    case "sham_cash":
+
+      return {
+        reply:
+          "نعتذر منك 🌹 لا يوجد لدينا تعامل أو تسليم حوالات عن طريق شام كاش.",
+        type: "sham_cash",
+        intent: route.intent,
+        confidence: route.confidence
+      };
+
+
+    case "receiver_change":
+
+      return {
+        reply:
+          "📋 تسليم الحوالة يكون باليد لصاحب العلاقة حصراً.\n\n" +
+          "إذا كنت لا تستطيع الحضور، يمكنك الاستفسار عن إمكانية تعديل اسم الحوالة إلى شخص آخر يستطيع الحضور والاستلام، ويجب أن يكون التعديل على اسم الشخص الذي سيحضر ويستلم.",
+        type: "receiver_change",
+        intent: route.intent,
+        confidence: route.confidence
+      };
+
+
+    case "later_collection":
+
+      return {
+        reply:
+          "📋 تبقى الحوالة موجودة حتى يأتي صاحب العلاقة ليستلمها، أو يمكن للمرسل استعادة المبلغ.",
+        type: "later_collection",
+        intent: route.intent,
+        confidence: route.confidence
+      };
+
+
+    case "complaint":
+
+      return {
+        reply:
+          "🌹 أكيد، اشرح لنا المشكلة بالتفصيل كتابةً، ليتم رفعها ومتابعتها مع المختص.",
+        type: "complaint",
+        intent: route.intent,
+        confidence: route.confidence
+      };
+
+
+    case "voice":
+
+      return {
+        reply:
+          "🌹 عذراً، يرجى كتابة استفسارك نصياً حتى أتمكن من مساعدتك.",
+        type: "voice",
+        intent: route.intent,
+        confidence: route.confidence
+      };
+
+
+    default:
+
+      return {
+        reply:
+          "🌹 أهلاً بك.\nلم أتمكن من فهم استفسارك بشكل واضح.\nيرجى توضيح طلبك كتابةً، وسيتم مساعدتك بأسرع وقت.",
+        type: "unknown",
+        intent: "unknown",
+        confidence: "low"
+      };
+  }
+}
+
+
+// ======================================================
+// الصفحة الرئيسية - اختبار AI فقط
 // ======================================================
 
 app.get("/", (req, res) => {
 
   res.send(`
 <!DOCTYPE html>
-
 <html lang="ar" dir="rtl">
 
 <head>
@@ -860,6 +791,10 @@ content="width=device-width, initial-scale=1">
 
 <style>
 
+* {
+  box-sizing: border-box;
+}
+
 body {
   font-family: Arial, sans-serif;
   background: #f3f4f6;
@@ -868,19 +803,24 @@ body {
 }
 
 .container {
-  max-width: 650px;
+  max-width: 700px;
   margin: auto;
 }
 
 .card {
   background: white;
   padding: 22px;
-  border-radius: 16px;
-  box-shadow: 0 4px 18px rgba(0,0,0,.08);
+  border-radius: 18px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.08);
 }
 
 h1 {
   margin-top: 0;
+}
+
+.subtitle {
+  color: #666;
+  margin-bottom: 20px;
 }
 
 label {
@@ -889,40 +829,25 @@ label {
   font-weight: bold;
 }
 
-input,
-select,
-button,
-textarea {
-
+textarea,
+button {
   width: 100%;
-  box-sizing: border-box;
-
-  padding: 12px;
-
-  margin-top: 7px;
-
-  border-radius: 8px;
-
+  padding: 13px;
+  margin-top: 8px;
+  border-radius: 10px;
   border: 1px solid #ccc;
-
   font-size: 16px;
 }
 
 textarea {
-  min-height: 100px;
+  min-height: 130px;
   resize: vertical;
 }
 
 button {
-
-  margin-top: 20px;
-
   background: #222;
-
   color: white;
-
   border: none;
-
   cursor: pointer;
 }
 
@@ -931,33 +856,47 @@ button:hover {
 }
 
 #result {
-
   display: none;
-
   margin-top: 20px;
-
-  padding: 15px;
-
-  border-radius: 10px;
-
-  white-space: pre-wrap;
-
-  line-height: 1.7;
-}
-
-.allowed {
-  background: #d9f7df;
-  color: #176b2c;
-}
-
-.denied {
-  background: #ffe0e0;
-  color: #9b1c1c;
+  padding: 18px;
+  border-radius: 12px;
+  line-height: 1.8;
 }
 
 .reply {
   background: #eef4ff;
   color: #173b72;
+}
+
+.error {
+  background: #ffe0e0;
+  color: #9b1c1c;
+}
+
+.intent {
+  background: #f1f1f1;
+  padding: 10px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.examples {
+  margin-top: 20px;
+  color: #555;
+  line-height: 2;
+}
+
+.example {
+  display: inline-block;
+  background: #f2f2f2;
+  padding: 5px 10px;
+  margin: 3px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.example:hover {
+  background: #ddd;
 }
 
 </style>
@@ -972,35 +911,9 @@ button:hover {
 
 <h1>🤖 مساعد شركة الاتحاد</h1>
 
-<p>
-واجهة اختبار خدمة العملاء + AI Router
-</p>
-
-<label>
-نوع المحادثة
-</label>
-
-<select id="type">
-
-<option value="user">
-👤 شخص
-</option>
-
-<option value="group">
-👥 مجموعة
-</option>
-
-</select>
-
-<label>
-المعرّف
-</label>
-
-<input
-id="id"
-type="text"
-placeholder="اكتب المعرّف"
-/>
+<div class="subtitle">
+اختبار AI Router — بدون معرف وبدون صلاحيات
+</div>
 
 <label>
 رسالة العميل
@@ -1011,58 +924,80 @@ id="message"
 placeholder="مثال: عنكن فرع تاني؟"
 ></textarea>
 
-<button onclick="testBot()">
-🔍 اختبار البوت
+<button onclick="testAI()">
+🤖 تحليل الرسالة
 </button>
 
 <div id="result"></div>
 
+<div class="examples">
+
+<strong>جرب أمثلة:</strong>
+
+<br>
+
+<span class="example"
+onclick="setExample('عنكن فرع تاني؟')">
+عنكن فرع تاني؟
+</span>
+
+<span class="example"
+onclick="setExample('وين محلكن؟')">
+وين محلكن؟
+</span>
+
+<span class="example"
+onclick="setExample('قديش الدولار؟')">
+قديش الدولار؟
+</span>
+
+<span class="example"
+onclick="setExample('الحوالة وصلت؟')">
+الحوالة وصلت؟
+</span>
+
+<span class="example"
+onclick="setExample('شو لازم جيب لاستلم الحوالة؟')">
+شو لازم جيب؟
+</span>
+
 </div>
 
 </div>
+
+</div>
+
 
 <script>
 
-async function testBot() {
+function setExample(text) {
 
-  const type =
-    document.getElementById("type").value;
+  document.getElementById("message").value = text;
 
-  const id =
-    document.getElementById("id").value.trim();
+}
+
+
+async function testAI() {
 
   const message =
-    document.getElementById("message").value.trim();
+    document.getElementById("message")
+      .value
+      .trim();
 
   const result =
     document.getElementById("result");
-
-
-  if (!id) {
-
-    result.style.display = "block";
-
-    result.className = "denied";
-
-    result.innerText =
-      "❌ يرجى كتابة المعرّف أولاً.";
-
-    return;
-
-  }
 
 
   if (!message) {
 
     result.style.display = "block";
 
-    result.className = "denied";
+    result.className = "error";
 
     result.innerText =
-      "❌ يرجى كتابة رسالة العميل.";
+      "❌ اكتب رسالة العميل أولاً.";
 
     return;
-
   }
 
 
@@ -1071,83 +1006,83 @@ async function testBot() {
   result.className = "reply";
 
   result.innerText =
-    "⏳ جاري تحليل الرسالة بواسطة AI...";
+    "⏳ جاري تحليل الرسالة...";
 
 
   try {
 
-    const response = await fetch(
-      "/test-message",
-      {
-        method: "POST",
+    const response =
+      await fetch(
+        "/ai-test",
+        {
+          method: "POST",
 
-        headers: {
-          "Content-Type": "application/json"
-        },
+          headers: {
+            "Content-Type": "application/json"
+          },
 
-        body: JSON.stringify({
-
-          chatType: type,
-
-          chatId: id,
-
-          message: message
-
-        })
-      }
-    );
+          body: JSON.stringify({
+            message
+          })
+        }
+      );
 
 
     const data =
       await response.json();
 
 
-    if (!data.allowed) {
+    if (!data.success) {
 
-      result.className = "denied";
+      result.className = "error";
 
       result.innerText =
-        "🚫 البوت لن يرد\\n\\n" +
-        data.reason;
+        "❌ " +
+        (data.error || "حدث خطأ.");
 
       return;
-
     }
 
 
     result.className = "reply";
 
-    result.innerText =
-      "✅ البوت مسموح له بالرد\\n\\n" +
+    result.innerHTML =
+      '<div class="intent">' +
+      '🧠 <strong>نوع الطلب:</strong> ' +
+      escapeHtml(data.intent) +
+      '<br>' +
+      '🎯 <strong>الثقة:</strong> ' +
+      escapeHtml(data.confidence) +
+      '</div>' +
 
-      "🧠 التصنيف:\\n" +
-      data.type +
+      '<strong>🤖 الرد المقترح:</strong>' +
+      '<br><br>' +
 
-      "\\n\\n" +
-
-      "📊 المصدر:\\n" +
-      data.router +
-
-      "\\n\\n" +
-
-      "🎯 الثقة:\\n" +
-      data.confidence +
-
-      "\\n\\n" +
-
-      "🤖 الرد المقترح:\\n\\n" +
-      data.reply;
+      escapeHtml(data.reply)
+        .replace(/\\n/g, "<br>");
 
   }
 
   catch (error) {
 
-    result.className = "denied";
+    result.className = "error";
 
     result.innerText =
       "❌ حدث خطأ في الاتصال بالسيرفر.";
 
   }
+
+}
+
+
+function escapeHtml(text) {
+
+  return String(text || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 
 }
 
@@ -1162,48 +1097,22 @@ async function testBot() {
 
 
 // ======================================================
-// اختبار الرسالة
+// اختبار AI Router
 // ======================================================
 
-app.post("/test-message", async (req, res) => {
-
-  const chatType =
-    req.body.chatType;
-
-  const chatId =
-    String(req.body.chatId || "");
+app.post("/ai-test", (req, res) => {
 
   const message =
     String(req.body.message || "");
 
+  if (!message.trim()) {
 
-  let allowed = false;
+    return res.status(400).json({
 
+      success: false,
 
-  if (chatType === "user") {
-
-    allowed =
-      isAllowedUser(chatId);
-
-  }
-
-
-  if (chatType === "group") {
-
-    allowed =
-      isAllowedGroup(chatId);
-
-  }
-
-
-  if (!allowed) {
-
-    return res.json({
-
-      allowed: false,
-
-      reason:
-        "هذا الشخص أو المجموعة غير موجود ضمن قائمة المسموح لهم."
+      error:
+        "الرسالة فارغة."
 
     });
 
@@ -1211,20 +1120,26 @@ app.post("/test-message", async (req, res) => {
 
 
   const result =
-    await generateReply(message);
+    generateReply(message);
 
 
   res.json({
 
-    allowed: true,
+    success: true,
 
-    reply: result.reply,
+    message,
 
-    type: result.type,
+    intent:
+      result.intent,
 
-    router: result.router,
+    confidence:
+      result.confidence,
 
-    confidence: result.confidence
+    type:
+      result.type,
+
+    reply:
+      result.reply
 
   });
 
@@ -1232,7 +1147,7 @@ app.post("/test-message", async (req, res) => {
 
 
 // ======================================================
-// اختبار الصلاحية القديم
+// اختبار الصلاحيات بشكل منفصل
 // ======================================================
 
 app.post("/test-permission", (req, res) => {
@@ -1250,7 +1165,8 @@ app.post("/test-permission", (req, res) => {
 
       allowed: false,
 
-      reason: "المعرّف فارغ"
+      reason:
+        "المعرّف فارغ."
 
     });
 
@@ -1267,9 +1183,10 @@ app.post("/test-permission", (req, res) => {
 
       allowed,
 
-      reason: allowed
-        ? "الشخص موجود ضمن قائمة المسموح لهم"
-        : "الشخص غير موجود ضمن قائمة المسموح لهم"
+      reason:
+        allowed
+          ? "الشخص موجود ضمن قائمة المسموح لهم."
+          : "الشخص غير موجود ضمن قائمة المسموح لهم."
 
     });
 
@@ -1286,9 +1203,10 @@ app.post("/test-permission", (req, res) => {
 
       allowed,
 
-      reason: allowed
-        ? "المجموعة موجودة ضمن قائمة المسموح بها"
-        : "المجموعة غير موجودة ضمن قائمة المسموح بها"
+      reason:
+        allowed
+          ? "المجموعة موجودة ضمن قائمة المسموح بها."
+          : "المجموعة غير موجودة ضمن قائمة المسموح بها."
 
     });
 
@@ -1299,7 +1217,8 @@ app.post("/test-permission", (req, res) => {
 
     allowed: false,
 
-    reason: "نوع المحادثة غير معروف"
+    reason:
+      "نوع المحادثة غير معروف."
 
   });
 
@@ -1307,7 +1226,7 @@ app.post("/test-permission", (req, res) => {
 
 
 // ======================================================
-// حالة البوت
+// حالة السيرفر
 // ======================================================
 
 app.get("/status", (req, res) => {
@@ -1359,7 +1278,7 @@ app.get("/status", (req, res) => {
       groups,
 
     aiRouter:
-      Boolean(process.env.GEMINI_API_KEY)
+      true
 
   });
 
