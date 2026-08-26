@@ -2,12 +2,23 @@ const express = require("express");
 const { GoogleGenAI } = require("@google/genai");
 const config = require("./config.json");
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+const {
+  default: makeWASocket,
+  DisconnectReason,
+  useMultiFileAuthState,
+  Browsers
+} = require("@whiskeysockets/baileys");
+
+const P = require("pino");
+const QRCode = require("qrcode");
+const path = require("path");
 
 // ======================================================
-// إعداد Express
+// Express
 // ======================================================
+
+const app = express();
+const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -27,11 +38,13 @@ if (GEMINI_API_KEY) {
 
   console.log("Gemini AI: enabled");
 } else {
-  console.log("Gemini AI: disabled - GEMINI_API_KEY not found");
+  console.log(
+    "Gemini AI: disabled - GEMINI_API_KEY not found"
+  );
 }
 
 // ======================================================
-// معلومات شركة الاتحاد
+// معلومات الشركة
 // ======================================================
 
 const COMPANY = {
@@ -94,6 +107,7 @@ function normalizeText(text) {
 // ======================================================
 
 function isAllowedUser(chatId) {
+
   const users =
     config.permissions &&
     Array.isArray(config.permissions.allowedUsers)
@@ -104,6 +118,7 @@ function isAllowedUser(chatId) {
 }
 
 function isAllowedGroup(chatId) {
+
   const groups =
     config.permissions &&
     Array.isArray(config.permissions.allowedGroups)
@@ -114,12 +129,142 @@ function isAllowedGroup(chatId) {
 }
 
 // ======================================================
+// هل المجموعة تحتاج منشن؟
+// ======================================================
+
+function groupOnlyWhenMentioned() {
+
+  return !!(
+    config.permissions &&
+    config.permissions.groupOnlyWhenMentioned
+  );
+}
+
+// ======================================================
+// استخراج رقم المرسل
+// ======================================================
+
+function getSenderId(message) {
+
+  if (!message || !message.key) {
+    return "";
+  }
+
+  return String(
+    message.key.participant ||
+    message.key.remoteJid ||
+    ""
+  );
+}
+
+// ======================================================
+// معرفة نوع المحادثة
+// ======================================================
+
+function getChatType(message) {
+
+  const jid =
+    String(message?.key?.remoteJid || "");
+
+  if (jid.endsWith("@g.us")) {
+    return "group";
+  }
+
+  if (jid.endsWith("@s.whatsapp.net")) {
+    return "user";
+  }
+
+  return "unknown";
+}
+
+// ======================================================
+// التحقق من المنشن
+// ======================================================
+
+function isMentioned(message, botJid) {
+
+  if (!message) {
+    return false;
+  }
+
+  const messageContent =
+    message.message?.extendedTextMessage;
+
+  const mentionedJid =
+    messageContent?.contextInfo?.mentionedJid || [];
+
+  if (!botJid) {
+    return mentionedJid.length > 0;
+  }
+
+  return mentionedJid.some(
+    jid => String(jid) === String(botJid)
+  );
+}
+
+// ======================================================
+// استخراج النص من رسالة واتساب
+// ======================================================
+
+function extractMessageText(message) {
+
+  if (!message || !message.message) {
+    return "";
+  }
+
+  const msg = message.message;
+
+  if (msg.conversation) {
+    return String(msg.conversation).trim();
+  }
+
+  if (msg.extendedTextMessage?.text) {
+    return String(
+      msg.extendedTextMessage.text
+    ).trim();
+  }
+
+  if (msg.imageMessage?.caption) {
+    return String(
+      msg.imageMessage.caption
+    ).trim();
+  }
+
+  if (msg.videoMessage?.caption) {
+    return String(
+      msg.videoMessage.caption
+    ).trim();
+  }
+
+  if (msg.documentMessage?.caption) {
+    return String(
+      msg.documentMessage.caption
+    ).trim();
+  }
+
+  return "";
+}
+
+// ======================================================
+// معرفة الرسائل الصوتية
+// ======================================================
+
+function isVoiceMessage(message) {
+
+  return !!(
+    message?.message?.audioMessage
+  );
+}
+
+// ======================================================
 // ردود الشركة الثابتة
 // ======================================================
 
 function getTodayDate() {
-  // تاريخ الخادم في Render
-  return new Date().toISOString().slice(0, 10);
+
+  return new Date()
+    .toISOString()
+    .slice(0, 10);
 }
 
 function buildReply(type) {
@@ -138,7 +283,6 @@ function buildReply(type) {
         type
       };
 
-
     // --------------------------------------------------
     // شكر
     // --------------------------------------------------
@@ -150,7 +294,6 @@ function buildReply(type) {
           "العفو 🌹 أهلاً وسهلاً بك دائماً.",
         type
       };
-
 
     // --------------------------------------------------
     // الموقع
@@ -167,7 +310,6 @@ function buildReply(type) {
         type
       };
 
-
     // --------------------------------------------------
     // الفروع
     // --------------------------------------------------
@@ -177,12 +319,15 @@ function buildReply(type) {
       return {
         reply:
           "🏢 أفرع شركة الاتحاد:\n\n" +
-          "1- " + COMPANY.branches[0] + "\n" +
-          "2- " + COMPANY.branches[1] + "\n\n" +
+          "1- " +
+          COMPANY.branches[0] +
+          "\n" +
+          "2- " +
+          COMPANY.branches[1] +
+          "\n\n" +
           COMPANY.mainBranch,
         type
       };
-
 
     // --------------------------------------------------
     // الدوام
@@ -190,11 +335,15 @@ function buildReply(type) {
 
     case "working_hours":
 
-      if (getTodayDate() === SPECIAL_HOLIDAY.date) {
+      if (
+        getTodayDate() ===
+        SPECIAL_HOLIDAY.date
+      ) {
 
         return {
           reply:
-            "⏱️ " + SPECIAL_HOLIDAY.text,
+            "⏱️ " +
+            SPECIAL_HOLIDAY.text,
           type: "special_holiday"
         };
 
@@ -206,7 +355,6 @@ function buildReply(type) {
           "والجمعة عطلة رسمية.",
         type
       };
-
 
     // --------------------------------------------------
     // الأسعار
@@ -225,7 +373,6 @@ function buildReply(type) {
         type
       };
 
-
     // --------------------------------------------------
     // استعلام حوالة
     // --------------------------------------------------
@@ -237,7 +384,6 @@ function buildReply(type) {
           "📋 يرجى إرسال إشعار الحوالة، وسيقوم القسم المختص بالتحقق منه والرد عليك بأسرع وقت.",
         type
       };
-
 
     // --------------------------------------------------
     // إشعار حوالة
@@ -251,9 +397,8 @@ function buildReply(type) {
         type
       };
 
-
     // --------------------------------------------------
-    // وثائق
+    // الوثائق
     // --------------------------------------------------
 
     case "documents":
@@ -268,7 +413,6 @@ function buildReply(type) {
         type
       };
 
-
     // --------------------------------------------------
     // شام كاش
     // --------------------------------------------------
@@ -280,7 +424,6 @@ function buildReply(type) {
           "نعتذر منك 🌹 لا يوجد لدينا تعامل أو تسليم حوالات عن طريق شام كاش.",
         type
       };
-
 
     // --------------------------------------------------
     // تغيير اسم المستفيد
@@ -295,7 +438,6 @@ function buildReply(type) {
         type
       };
 
-
     // --------------------------------------------------
     // الاستلام لاحقاً
     // --------------------------------------------------
@@ -307,7 +449,6 @@ function buildReply(type) {
           "📋 تبقى الحوالة موجودة حتى يأتي صاحب العلاقة ليستلمها، أو يمكن للمرسل استعادة المبلغ.",
         type
       };
-
 
     // --------------------------------------------------
     // شكوى
@@ -321,7 +462,6 @@ function buildReply(type) {
         type
       };
 
-
     // --------------------------------------------------
     // رسالة صوتية
     // --------------------------------------------------
@@ -333,7 +473,6 @@ function buildReply(type) {
           "🌹 عذراً، يرجى كتابة استفسارك نصياً حتى أتمكن من مساعدتك.",
         type
       };
-
 
     // --------------------------------------------------
     // غير معروف
@@ -355,21 +494,19 @@ function buildReply(type) {
 
 async function aiRouter(message) {
 
-  const text = String(message || "").trim();
+  const text =
+    String(message || "").trim();
 
   if (!text) {
+
     return {
       type: "greeting",
       confidence: 1
     };
   }
 
-  // ----------------------------------------------------
-  // إذا Gemini غير موجود
-  // نستخدم Router احتياطي بسيط
-  // ----------------------------------------------------
-
   if (!ai) {
+
     return fallbackRouter(text);
   }
 
@@ -438,6 +575,7 @@ unknown
 قواعد مهمة:
 
 - افهم اللهجة السورية.
+- افهم اللهجة الحلبية.
 - افهم الأخطاء الإملائية.
 - افهم الاختصارات.
 - "وين مكتبكن" = location.
@@ -465,18 +603,19 @@ ${text}
 
   try {
 
-    const response = await ai.models.generateContent({
+    const response =
+      await ai.models.generateContent({
 
-      model: "gemini-2.5-flash",
+        model: "gemini-2.5-flash",
 
-      contents: prompt,
+        contents: prompt,
 
-      config: {
-        temperature: 0,
-        responseMimeType: "application/json"
-      }
+        config: {
+          temperature: 0,
+          responseMimeType: "application/json"
+        }
 
-    });
+      });
 
     const raw =
       response.text || "";
@@ -508,13 +647,16 @@ ${text}
       "unknown"
     ];
 
-    if (!allowedTypes.includes(result.type)) {
+    if (
+      !allowedTypes.includes(
+        result.type
+      )
+    ) {
 
       return {
         type: "unknown",
         confidence: 0
       };
-
     }
 
     return {
@@ -536,17 +678,18 @@ ${text}
 
 // ======================================================
 // Router احتياطي
-// يستخدم فقط إذا Gemini غير متاح
 // ======================================================
 
 function fallbackRouter(message) {
 
-  const text = normalizeText(message);
+  const text =
+    normalizeText(message);
 
   if (
     /مرحبا|اهلا|اهلين|السلام عليكم|سلام عليكم|هلا|هاي|صباح الخير|مسا الخير|مساء الخير/
       .test(text)
   ) {
+
     return {
       type: "greeting",
       confidence: 0.8
@@ -557,6 +700,7 @@ function fallbackRouter(message) {
     /شكرا|مشكور|يسلمو|يعطيكم العافيه|يعطيكم العافية/
       .test(text)
   ) {
+
     return {
       type: "thanks",
       confidence: 0.8
@@ -567,6 +711,7 @@ function fallbackRouter(message) {
     /وين.*(مكتب|محل|عنوان|مكان)|مكتب.*وين|محل.*وين|عنوان.*وين|وينكن|موقعكن|العنوان|العنون|عنون/
       .test(text)
   ) {
+
     return {
       type: "location",
       confidence: 0.9
@@ -577,6 +722,7 @@ function fallbackRouter(message) {
     /فرع|فروع|افرع|أفرع|مكتب تاني|محل تاني|غير الشعار/
       .test(text)
   ) {
+
     return {
       type: "branches",
       confidence: 0.9
@@ -587,6 +733,7 @@ function fallbackRouter(message) {
     /دوام|فاتحين|فاتح|تفتحو|تفتحوا|متى تفتح|امتا تفتحو|مسكر|مسكرين|تسكرو|تسكروا|بتسكرو/
       .test(text)
   ) {
+
     return {
       type: "working_hours",
       confidence: 0.9
@@ -597,6 +744,7 @@ function fallbackRouter(message) {
     /سعر|اسعار|أسعار|صرف|دولار|يورو|تركي|الليرة|قديش|كم/
       .test(text)
   ) {
+
     return {
       type: "rates",
       confidence: 0.8
@@ -607,6 +755,7 @@ function fallbackRouter(message) {
     /حواله|حوالة|حوالتي|وصلت.*حوال|حوال.*وصلت|استلم حوال|استلام حوال/
       .test(text)
   ) {
+
     return {
       type: "transfer_check",
       confidence: 0.85
@@ -617,13 +766,18 @@ function fallbackRouter(message) {
     /هوية|هويه|جواز|اخراج قيد|إخراج قيد|اوراق|أوراق|وثيقه|وثيقة/
       .test(text)
   ) {
+
     return {
       type: "documents",
       confidence: 0.85
     };
   }
 
-  if (/شام كاش|شامكاش|sham cash/.test(text)) {
+  if (
+    /شام كاش|شامكاش|sham cash/
+      .test(text)
+  ) {
+
     return {
       type: "sham_cash",
       confidence: 0.95
@@ -634,6 +788,7 @@ function fallbackRouter(message) {
     /حدا يستلم عني|شخص يستلم عني|غيري يستلم|اخي يستلم|زوجتي تستلم|زوجي يستلم/
       .test(text)
   ) {
+
     return {
       type: "receiver_change",
       confidence: 0.85
@@ -644,6 +799,7 @@ function fallbackRouter(message) {
     /شكوى|شكايه|شكاية|مشكله|مشكلة|الاداره|الإدارة|المدير/
       .test(text)
   ) {
+
     return {
       type: "complaint",
       confidence: 0.9
@@ -670,8 +826,612 @@ async function generateAIReply(message) {
 
   return {
     ...result,
-    confidence: route.confidence
+    confidence:
+      route.confidence
   };
+}
+
+// ======================================================
+// WhatsApp
+// ======================================================
+
+const AUTH_FOLDER =
+  path.join(
+    process.cwd(),
+    "auth_info_baileys"
+  );
+
+let whatsappSocket = null;
+
+let whatsappStatus =
+  "starting";
+
+let currentQRCode =
+  null;
+
+let currentQRDataURL =
+  null;
+
+let whatsappJid =
+  null;
+
+// ======================================================
+// الاتصال بواتساب
+// ======================================================
+
+async function connectToWhatsApp() {
+
+  try {
+
+    console.log(
+      "======================================"
+    );
+
+    console.log(
+      "Starting WhatsApp connection..."
+    );
+
+    whatsappStatus =
+      "connecting";
+
+    const {
+      state,
+      saveCreds
+    } =
+      await useMultiFileAuthState(
+        AUTH_FOLDER
+      );
+
+    const sock =
+      makeWASocket({
+
+        auth: state,
+
+        browser:
+          Browsers.ubuntu(
+            "Al-Ittihad AI Bot"
+          ),
+
+        logger:
+          P({
+            level: "silent"
+          }),
+
+        markOnlineOnConnect: false,
+
+        printQRInTerminal: false
+      });
+
+    whatsappSocket =
+      sock;
+
+    // ==================================================
+    // حفظ بيانات الجلسة
+    // ==================================================
+
+    sock.ev.on(
+      "creds.update",
+      saveCreds
+    );
+
+    // ==================================================
+    // تحديث حالة الاتصال و QR
+    // ==================================================
+
+    sock.ev.on(
+      "connection.update",
+      async update => {
+
+        const {
+          connection,
+          lastDisconnect,
+          qr
+        } = update;
+
+        // ----------------------------------------------
+        // QR
+        // ----------------------------------------------
+
+        if (qr) {
+
+          currentQRCode =
+            qr;
+
+          try {
+
+            currentQRDataURL =
+              await QRCode.toDataURL(
+                qr,
+                {
+                  width: 400,
+                  margin: 2
+                }
+              );
+
+            console.log(
+              "📱 WhatsApp QR is ready."
+            );
+
+            console.log(
+              "Open /qr to scan the QR code."
+            );
+
+          } catch (error) {
+
+            console.log(
+              "QR generation error:",
+              error.message
+            );
+          }
+        }
+
+        // ----------------------------------------------
+        // اتصال
+        // ----------------------------------------------
+
+        if (connection === "connecting") {
+
+          whatsappStatus =
+            "connecting";
+
+          console.log(
+            "🟡 WhatsApp connecting..."
+          );
+        }
+
+        // ----------------------------------------------
+        // متصل
+        // ----------------------------------------------
+
+        if (connection === "open") {
+
+          whatsappStatus =
+            "connected";
+
+          currentQRCode =
+            null;
+
+          currentQRDataURL =
+            null;
+
+          whatsappJid =
+            sock.user?.id ||
+            null;
+
+          console.log(
+            "======================================"
+          );
+
+          console.log(
+            "✅ WhatsApp connected successfully!"
+          );
+
+          console.log(
+            "WhatsApp JID:",
+            whatsappJid
+          );
+
+          console.log(
+            "======================================"
+          );
+        }
+
+        // ----------------------------------------------
+        // انقطع الاتصال
+        // ----------------------------------------------
+
+        if (connection === "close") {
+
+          whatsappStatus =
+            "disconnected";
+
+          const statusCode =
+            lastDisconnect
+              ?.error
+              ?.output
+              ?.statusCode;
+
+          const shouldReconnect =
+            statusCode !==
+            DisconnectReason.loggedOut;
+
+          console.log(
+            "❌ WhatsApp connection closed."
+          );
+
+          console.log(
+            "Status code:",
+            statusCode
+          );
+
+          console.log(
+            "Reconnect:",
+            shouldReconnect
+          );
+
+          if (shouldReconnect) {
+
+            whatsappStatus =
+              "reconnecting";
+
+            currentQRCode =
+              null;
+
+            currentQRDataURL =
+              null;
+
+            setTimeout(
+              () => {
+
+                connectToWhatsApp()
+                  .catch(error => {
+
+                    console.log(
+                      "Reconnect error:",
+                      error.message
+                    );
+
+                  });
+
+              },
+              3000
+            );
+
+          } else {
+
+            console.log(
+              "⚠️ WhatsApp logged out."
+            );
+
+            whatsappStatus =
+              "logged_out";
+
+            currentQRCode =
+              null;
+
+            currentQRDataURL =
+              null;
+
+            whatsappSocket =
+              null;
+          }
+        }
+      }
+    );
+
+    // ==================================================
+    // استقبال الرسائل
+    // ==================================================
+
+    sock.ev.on(
+      "messages.upsert",
+      async ({ messages, type }) => {
+
+        try {
+
+          if (
+            !messages ||
+            !Array.isArray(messages)
+          ) {
+            return;
+          }
+
+          for (
+            const message of messages
+          ) {
+
+            await handleWhatsAppMessage(
+              sock,
+              message
+            );
+          }
+
+        } catch (error) {
+
+          console.log(
+            "WhatsApp message handler error:",
+            error.message
+          );
+        }
+      }
+    );
+
+  } catch (error) {
+
+    whatsappStatus =
+      "error";
+
+    console.log(
+      "WhatsApp startup error:",
+      error.message
+    );
+
+    setTimeout(
+      () => {
+
+        connectToWhatsApp()
+          .catch(err => {
+
+            console.log(
+              "WhatsApp retry error:",
+              err.message
+            );
+
+          });
+
+      },
+      5000
+    );
+  }
+}
+
+// ======================================================
+// معالجة رسالة واتساب
+// ======================================================
+
+async function handleWhatsAppMessage(
+  sock,
+  message
+) {
+
+  if (!message) {
+    return;
+  }
+
+  // ----------------------------------------------
+  // تجاهل الرسائل الصادرة من البوت نفسه
+  // ----------------------------------------------
+
+  if (message.key?.fromMe) {
+    return;
+  }
+
+  // ----------------------------------------------
+  // تجاهل Status
+  // ----------------------------------------------
+
+  const remoteJid =
+    String(
+      message.key?.remoteJid || ""
+    );
+
+  if (
+    !remoteJid ||
+    remoteJid === "status@broadcast"
+  ) {
+    return;
+  }
+
+  // ----------------------------------------------
+  // معرفة نوع المحادثة
+  // ----------------------------------------------
+
+  const chatType =
+    getChatType(message);
+
+  // ----------------------------------------------
+  // استخراج المرسل
+  // ----------------------------------------------
+
+  const senderId =
+    getSenderId(message);
+
+  console.log(
+    "--------------------------------------"
+  );
+
+  console.log(
+    "WhatsApp message received"
+  );
+
+  console.log(
+    "Chat:",
+    remoteJid
+  );
+
+  console.log(
+    "Type:",
+    chatType
+  );
+
+  console.log(
+    "Sender:",
+    senderId
+  );
+
+  // ----------------------------------------------
+  // صلاحيات المستخدم
+  // ----------------------------------------------
+
+  if (chatType === "user") {
+
+    if (
+      !isAllowedUser(senderId) &&
+      !isAllowedUser(remoteJid)
+    ) {
+
+      console.log(
+        "⛔ User not allowed:",
+        senderId
+      );
+
+      return;
+    }
+  }
+
+  // ----------------------------------------------
+  // صلاحيات المجموعة
+  // ----------------------------------------------
+
+  if (chatType === "group") {
+
+    if (
+      !isAllowedGroup(remoteJid)
+    ) {
+
+      console.log(
+        "⛔ Group not allowed:",
+        remoteJid
+      );
+
+      return;
+    }
+
+    // --------------------------------------------
+    // إذا المجموعة تتطلب منشن
+    // --------------------------------------------
+
+    if (
+      groupOnlyWhenMentioned()
+    ) {
+
+      const mentioned =
+        isMentioned(
+          message,
+          whatsappJid
+        );
+
+      if (!mentioned) {
+
+        console.log(
+          "⏭️ Group message ignored - bot not mentioned"
+        );
+
+        return;
+      }
+    }
+  }
+
+  // ----------------------------------------------
+  // رسالة صوتية
+  // ----------------------------------------------
+
+  if (
+    isVoiceMessage(message)
+  ) {
+
+    const result =
+      buildReply("voice");
+
+    await sock.sendMessage(
+      remoteJid,
+      {
+        text: result.reply
+      }
+    );
+
+    console.log(
+      "🤖 Voice reply sent."
+    );
+
+    return;
+  }
+
+  // ----------------------------------------------
+  // استخراج النص
+  // ----------------------------------------------
+
+  let text =
+    extractMessageText(message);
+
+  if (!text) {
+
+    console.log(
+      "⏭️ Message has no readable text."
+    );
+
+    return;
+  }
+
+  // ----------------------------------------------
+  // إزالة منشن البوت من النص
+  // ----------------------------------------------
+
+  text =
+    text
+      .replace(
+        /@\d{5,20}/g,
+        ""
+      )
+      .trim();
+
+  if (!text) {
+    return;
+  }
+
+  console.log(
+    "Message:",
+    text
+  );
+
+  // ----------------------------------------------
+  // معالجة Gemini
+  // ----------------------------------------------
+
+  try {
+
+    console.log(
+      "🤖 Sending message to AI..."
+    );
+
+    const result =
+      await generateAIReply(text);
+
+    console.log(
+      "AI type:",
+      result.type
+    );
+
+    console.log(
+      "AI confidence:",
+      result.confidence
+    );
+
+    console.log(
+      "AI reply:",
+      result.reply
+    );
+
+    // --------------------------------------------
+    // إرسال الرد
+    // --------------------------------------------
+
+    await sock.sendMessage(
+      remoteJid,
+      {
+        text: result.reply
+      }
+    );
+
+    console.log(
+      "✅ Reply sent successfully."
+    );
+
+  } catch (error) {
+
+    console.log(
+      "❌ Reply error:",
+      error.message
+    );
+
+    try {
+
+      await sock.sendMessage(
+        remoteJid,
+        {
+          text:
+            "🌹 عذراً، حدث خطأ مؤقت. يرجى المحاولة مرة أخرى."
+        }
+      );
+
+    } catch (sendError) {
+
+      console.log(
+        "Fallback reply error:",
+        sendError.message
+      );
+    }
+  }
 }
 
 // ======================================================
@@ -724,24 +1484,377 @@ h1 {
 }
 
 .status {
-  padding: 10px;
+  padding: 12px;
   border-radius: 8px;
   background: #e8f5e9;
   color: #176b2c;
   margin-bottom: 15px;
 }
 
-label {
+a {
+  color: #1565c0;
+  text-decoration: none;
+}
+
+.menu {
+  display: grid;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.menu a {
   display: block;
-  margin-top: 15px;
-  font-weight: bold;
+  background: #f5f5f5;
+  padding: 14px;
+  border-radius: 10px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<div class="card">
+
+<h1>🤖 مساعد شركة الاتحاد</h1>
+
+<div class="status">
+🟢 نظام البوت يعمل
+</div>
+
+<p>
+📱 حالة واتساب:
+<a href="/qr">
+فتح صفحة ربط واتساب
+</a>
+</p>
+
+<div class="menu">
+
+<a href="/qr">
+📷 QR — ربط واتساب
+</a>
+
+<a href="/status">
+📊 حالة البوت
+</a>
+
+<a href="/test">
+🧪 اختبار الذكاء الاصطناعي
+</a>
+
+</div>
+
+</div>
+
+</div>
+
+</body>
+
+</html>
+  `);
+
+});
+
+// ======================================================
+// صفحة QR
+// ======================================================
+
+app.get("/qr", (req, res) => {
+
+  const connected =
+    whatsappStatus ===
+    "connected";
+
+  if (connected) {
+
+    return res.send(`
+<!DOCTYPE html>
+
+<html lang="ar" dir="rtl">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport"
+content="width=device-width, initial-scale=1">
+
+<title>WhatsApp Connected</title>
+
+<style>
+
+body {
+  font-family: Arial;
+  background: #f3f4f6;
+  text-align: center;
+  padding: 30px;
+}
+
+.card {
+  background: white;
+  max-width: 500px;
+  margin: auto;
+  padding: 30px;
+  border-radius: 20px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.08);
+}
+
+.ok {
+  font-size: 60px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="card">
+
+<div class="ok">✅</div>
+
+<h2>واتساب متصل</h2>
+
+<p>
+البوت مربوط بواتساب بنجاح.
+</p>
+
+<p>
+${whatsappJid || ""}
+</p>
+
+<a href="/status">
+📊 عرض الحالة
+</a>
+
+</div>
+
+</body>
+
+</html>
+    `);
+  }
+
+  if (!currentQRDataURL) {
+
+    return res.send(`
+<!DOCTYPE html>
+
+<html lang="ar" dir="rtl">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport"
+content="width=device-width, initial-scale=1">
+
+<meta http-equiv="refresh"
+content="5">
+
+<title>WhatsApp QR</title>
+
+<style>
+
+body {
+  font-family: Arial;
+  background: #f3f4f6;
+  text-align: center;
+  padding: 30px;
+}
+
+.card {
+  background: white;
+  max-width: 500px;
+  margin: auto;
+  padding: 30px;
+  border-radius: 20px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.08);
+}
+
+.loader {
+  font-size: 50px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="card">
+
+<div class="loader">⏳</div>
+
+<h2>جاري تجهيز QR</h2>
+
+<p>
+حالة واتساب:
+${whatsappStatus}
+</p>
+
+<p>
+الصفحة رح تتحدث تلقائياً.
+</p>
+
+</div>
+
+</body>
+
+</html>
+    `);
+  }
+
+  res.send(`
+<!DOCTYPE html>
+
+<html lang="ar" dir="rtl">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport"
+content="width=device-width, initial-scale=1">
+
+<meta http-equiv="refresh"
+content="20">
+
+<title>ربط واتساب</title>
+
+<style>
+
+body {
+  font-family: Arial;
+  background: #f3f4f6;
+  text-align: center;
+  padding: 20px;
+}
+
+.card {
+  background: white;
+  max-width: 500px;
+  margin: auto;
+  padding: 25px;
+  border-radius: 20px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.08);
+}
+
+img {
+  width: 100%;
+  max-width: 400px;
+  border-radius: 12px;
+}
+
+.step {
+  background: #f5f5f5;
+  padding: 12px;
+  border-radius: 10px;
+  margin-top: 10px;
+  text-align: right;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="card">
+
+<h2>📱 ربط واتساب</h2>
+
+<p>
+امسح رمز QR من تطبيق واتساب على الهاتف.
+</p>
+
+<img
+src="${currentQRDataURL}"
+alt="WhatsApp QR"
+/>
+
+<div class="step">
+<b>1.</b>
+افتح واتساب على الهاتف.
+</div>
+
+<div class="step">
+<b>2.</b>
+الإعدادات ← الأجهزة المرتبطة.
+</div>
+
+<div class="step">
+<b>3.</b>
+اضغط "ربط جهاز".
+</div>
+
+<div class="step">
+<b>4.</b>
+امسح رمز QR الظاهر بالأعلى.
+</div>
+
+<p>
+🔄 سيتم تحديث الحالة تلقائياً.
+</p>
+
+</div>
+
+</body>
+
+</html>
+  `);
+
+});
+
+// ======================================================
+// اختبار AI
+// ======================================================
+
+app.get("/test", (req, res) => {
+
+  res.send(`
+<!DOCTYPE html>
+
+<html lang="ar" dir="rtl">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport"
+content="width=device-width, initial-scale=1">
+
+<title>اختبار AI</title>
+
+<style>
+
+body {
+  font-family: Arial;
+  background: #f3f4f6;
+  padding: 20px;
+}
+
+.container {
+  max-width: 650px;
+  margin: auto;
+}
+
+.card {
+  background: white;
+  padding: 22px;
+  border-radius: 16px;
+  box-shadow: 0 4px 18px rgba(0,0,0,.08);
 }
 
 textarea,
 button {
   width: 100%;
   padding: 13px;
-  margin-top: 8px;
+  margin-top: 10px;
   border-radius: 8px;
   border: 1px solid #ccc;
   font-size: 16px;
@@ -749,18 +1862,12 @@ button {
 
 textarea {
   min-height: 120px;
-  resize: vertical;
 }
 
 button {
   background: #222;
   color: white;
-  border: none;
   cursor: pointer;
-}
-
-button:hover {
-  opacity: .9;
 }
 
 #result {
@@ -782,12 +1889,6 @@ button:hover {
   color: #9b1c1c;
 }
 
-.type {
-  margin-top: 12px;
-  font-size: 14px;
-  color: #555;
-}
-
 </style>
 
 </head>
@@ -798,15 +1899,7 @@ button:hover {
 
 <div class="card">
 
-<h1>🤖 مساعد شركة الاتحاد</h1>
-
-<div class="status">
-🟢 اختبار AI Router — الصلاحيات غير مطلوبة هنا
-</div>
-
-<label>
-رسالة العميل
-</label>
+<h2>🤖 اختبار فهم الذكاء الاصطناعي</h2>
 
 <textarea
 id="message"
@@ -814,7 +1907,7 @@ placeholder="مثال: وين مكتبكن؟"
 ></textarea>
 
 <button onclick="testAI()">
-🤖 اختبار فهم الذكاء الاصطناعي
+اختبار
 </button>
 
 <div id="result"></div>
@@ -828,7 +1921,10 @@ placeholder="مثال: وين مكتبكن؟"
 async function testAI() {
 
   const message =
-    document.getElementById("message").value.trim();
+    document
+      .getElementById("message")
+      .value
+      .trim();
 
   const result =
     document.getElementById("result");
@@ -846,7 +1942,7 @@ async function testAI() {
   result.style.display = "block";
   result.className = "reply";
   result.innerText =
-    "⏳ جاري فهم رسالة العميل...";
+    "⏳ جاري الفهم...";
 
   try {
 
@@ -856,7 +1952,8 @@ async function testAI() {
         method: "POST",
 
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type":
+            "application/json"
         },
 
         body: JSON.stringify({
@@ -870,16 +1967,19 @@ async function testAI() {
 
     if (!response.ok) {
 
-      result.className = "error";
+      result.className =
+        "error";
 
       result.innerText =
         "❌ " +
-        (data.error || "حدث خطأ.");
+        (data.error ||
+        "حدث خطأ.");
 
       return;
     }
 
-    result.className = "reply";
+    result.className =
+      "reply";
 
     result.innerText =
       "🤖 الرد المقترح:\\n\\n" +
@@ -888,17 +1988,20 @@ async function testAI() {
       "📌 التصنيف: " +
       data.type +
       "\\n" +
-      "🎯 نسبة الثقة: " +
-      Math.round((data.confidence || 0) * 100) +
+      "🎯 الثقة: " +
+      Math.round(
+        (data.confidence || 0) *
+        100
+      ) +
       "%";
 
   } catch (error) {
 
-    result.className = "error";
+    result.className =
+      "error";
 
     result.innerText =
       "❌ تعذر الاتصال بالسيرفر.";
-
   }
 
 }
@@ -913,8 +2016,7 @@ async function testAI() {
 });
 
 // ======================================================
-// اختبار AI فقط
-// لا يحتاج معرف ولا صلاحيات
+// API اختبار AI
 // ======================================================
 
 app.post("/test-ai", async (req, res) => {
@@ -922,18 +2024,24 @@ app.post("/test-ai", async (req, res) => {
   try {
 
     const message =
-      String(req.body.message || "").trim();
+      String(
+        req.body.message || ""
+      ).trim();
 
     if (!message) {
 
-      return res.status(400).json({
-        error: "الرسالة فارغة"
-      });
-
+      return res
+        .status(400)
+        .json({
+          error:
+            "الرسالة فارغة"
+        });
     }
 
     const result =
-      await generateAIReply(message);
+      await generateAIReply(
+        message
+      );
 
     res.json(result);
 
@@ -944,137 +2052,176 @@ app.post("/test-ai", async (req, res) => {
       error.message
     );
 
-    res.status(500).json({
-      error: "حدث خطأ أثناء معالجة الرسالة."
-    });
-
+    res
+      .status(500)
+      .json({
+        error:
+          "حدث خطأ أثناء معالجة الرسالة."
+      });
   }
 
 });
 
 // ======================================================
 // اختبار رسالة مع الصلاحيات
-// هذا منفصل عن AI
 // ======================================================
 
-app.post("/test-message", async (req, res) => {
+app.post(
+  "/test-message",
+  async (req, res) => {
 
-  const chatType =
-    req.body.chatType;
+    const chatType =
+      req.body.chatType;
 
-  const chatId =
-    String(req.body.chatId || "");
+    const chatId =
+      String(
+        req.body.chatId || ""
+      );
 
-  const message =
-    String(req.body.message || "");
+    const message =
+      String(
+        req.body.message || ""
+      );
 
-  let allowed = false;
+    let allowed = false;
 
-  if (chatType === "user") {
-    allowed = isAllowedUser(chatId);
+    if (
+      chatType === "user"
+    ) {
+
+      allowed =
+        isAllowedUser(
+          chatId
+        );
+    }
+
+    if (
+      chatType === "group"
+    ) {
+
+      allowed =
+        isAllowedGroup(
+          chatId
+        );
+    }
+
+    if (!allowed) {
+
+      return res.json({
+
+        allowed: false,
+
+        reason:
+          "هذا الشخص أو المجموعة غير موجود ضمن قائمة المسموح لهم."
+
+      });
+    }
+
+    const result =
+      await generateAIReply(
+        message
+      );
+
+    res.json({
+
+      allowed: true,
+
+      reply:
+        result.reply,
+
+      type:
+        result.type,
+
+      confidence:
+        result.confidence
+
+    });
+
   }
+);
 
-  if (chatType === "group") {
-    allowed = isAllowedGroup(chatId);
-  }
+// ======================================================
+// اختبار الصلاحية
+// ======================================================
 
-  if (!allowed) {
+app.post(
+  "/test-permission",
+  (req, res) => {
+
+    const chatType =
+      req.body.chatType;
+
+    const chatId =
+      String(
+        req.body.chatId || ""
+      );
+
+    if (!chatId) {
+
+      return res.json({
+
+        allowed: false,
+
+        reason:
+          "المعرّف فارغ"
+
+      });
+    }
+
+    if (
+      chatType === "user"
+    ) {
+
+      const allowed =
+        isAllowedUser(
+          chatId
+        );
+
+      return res.json({
+
+        allowed,
+
+        reason:
+          allowed
+            ? "الشخص موجود ضمن قائمة المسموح لهم"
+            : "الشخص غير موجود ضمن قائمة المسموح لهم"
+
+      });
+
+    }
+
+    if (
+      chatType === "group"
+    ) {
+
+      const allowed =
+        isAllowedGroup(
+          chatId
+        );
+
+      return res.json({
+
+        allowed,
+
+        reason:
+          allowed
+            ? "المجموعة موجودة ضمن قائمة المسموح بها"
+            : "المجموعة غير موجودة ضمن قائمة المسموح بها"
+
+      });
+    }
 
     return res.json({
 
       allowed: false,
 
       reason:
-        "هذا الشخص أو المجموعة غير موجود ضمن قائمة المسموح لهم."
+        "نوع المحادثة غير معروف"
 
     });
 
   }
-
-  const result =
-    await generateAIReply(message);
-
-  res.json({
-
-    allowed: true,
-
-    reply: result.reply,
-
-    type: result.type,
-
-    confidence: result.confidence
-
-  });
-
-});
-
-// ======================================================
-// اختبار الصلاحية
-// ======================================================
-
-app.post("/test-permission", (req, res) => {
-
-  const chatType =
-    req.body.chatType;
-
-  const chatId =
-    String(req.body.chatId || "");
-
-  if (!chatId) {
-
-    return res.json({
-
-      allowed: false,
-
-      reason: "المعرّف فارغ"
-
-    });
-
-  }
-
-  if (chatType === "user") {
-
-    const allowed =
-      isAllowedUser(chatId);
-
-    return res.json({
-
-      allowed,
-
-      reason: allowed
-        ? "الشخص موجود ضمن قائمة المسموح لهم"
-        : "الشخص غير موجود ضمن قائمة المسموح لهم"
-
-    });
-
-  }
-
-  if (chatType === "group") {
-
-    const allowed =
-      isAllowedGroup(chatId);
-
-    return res.json({
-
-      allowed,
-
-      reason: allowed
-        ? "المجموعة موجودة ضمن قائمة المسموح بها"
-        : "المجموعة غير موجودة ضمن قائمة المسموح بها"
-
-    });
-
-  }
-
-  return res.json({
-
-    allowed: false,
-
-    reason: "نوع المحادثة غير معروف"
-
-  });
-
-});
+);
 
 // ======================================================
 // حالة البوت
@@ -1084,13 +2231,17 @@ app.get("/status", (req, res) => {
 
   const users =
     config.permissions &&
-    Array.isArray(config.permissions.allowedUsers)
+    Array.isArray(
+      config.permissions.allowedUsers
+    )
       ? config.permissions.allowedUsers.length
       : 0;
 
   const groups =
     config.permissions &&
-    Array.isArray(config.permissions.allowedGroups)
+    Array.isArray(
+      config.permissions.allowedGroups
+    )
       ? config.permissions.allowedGroups.length
       : 0;
 
@@ -1129,20 +2280,95 @@ app.get("/status", (req, res) => {
     ai:
       ai
         ? "Gemini enabled"
-        : "Gemini disabled"
+        : "Gemini disabled",
+
+    whatsapp:
+      whatsappStatus,
+
+    whatsappJid:
+      whatsappJid || null,
+
+    qrAvailable:
+      !!currentQRDataURL
 
   });
 
 });
 
 // ======================================================
+// API حالة WhatsApp
+// ======================================================
+
+app.get(
+  "/whatsapp-status",
+  (req, res) => {
+
+    res.json({
+
+      status:
+        whatsappStatus,
+
+      connected:
+        whatsappStatus ===
+        "connected",
+
+      jid:
+        whatsappJid || null,
+
+      qrAvailable:
+        !!currentQRDataURL
+
+    });
+
+  }
+);
+
+// ======================================================
 // تشغيل السيرفر
 // ======================================================
 
-app.listen(PORT, () => {
+app.listen(
+  PORT,
+  () => {
 
-  console.log(
-    "Server running on port " + PORT
-  );
+    console.log(
+      "======================================"
+    );
 
-});
+    console.log(
+      "Server running on port " +
+      PORT
+    );
+
+    console.log(
+      "WhatsApp QR page: /qr"
+    );
+
+    console.log(
+      "AI test page: /test"
+    );
+
+    console.log(
+      "Status: /status"
+    );
+
+    console.log(
+      "======================================"
+    );
+
+  }
+);
+
+// ======================================================
+// تشغيل WhatsApp
+// ======================================================
+
+connectToWhatsApp()
+  .catch(error => {
+
+    console.log(
+      "Initial WhatsApp connection error:",
+      error.message
+    );
+
+  });
