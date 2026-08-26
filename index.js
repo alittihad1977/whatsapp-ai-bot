@@ -307,20 +307,24 @@ function getAllowedGroups() {
   )
     ? config.permissions.allowedGroups.map(String)
     : [];
-}
-
 function isAllowedUser(chatId) {
-  const users = getAllowedUsers();
+  const users =
+    config.permissions &&
+    Array.isArray(
+      config.permissions.allowedUsers
+    )
+      ? config.permissions.allowedUsers
+      : [];
 
-  // إذا القائمة فارغة = السماح للجميع
+  // إذا كانت القائمة فارغة = السماح لجميع المستخدمين
   if (users.length === 0) {
     return true;
   }
 
-  return users.includes(String(chatId));
+  return users.includes(
+    String(chatId)
+  );
 }
-
-function isAllowedGroup(chatId) {
   const groups = getAllowedGroups();
 
   // المجموعات لا نسمح بها افتراضياً
@@ -342,14 +346,21 @@ function groupOnlyWhenMentioned() {
 // ======================================================
 
 function getChatType(message) {
-  const jid =
-    String(message?.key?.remoteJid || "");
+  const jid = String(
+    message?.key?.remoteJid || ""
+  );
 
-  if (jid.endsWith("@g.us")) {
+  if (
+    jid.endsWith("@g.us")
+  ) {
     return "group";
   }
 
-  if (jid.endsWith("@s.whatsapp.net")) {
+  // WhatsApp الجديد قد يستخدم @lid
+  if (
+    jid.endsWith("@s.whatsapp.net") ||
+    jid.endsWith("@lid")
+  ) {
     return "user";
   }
 
