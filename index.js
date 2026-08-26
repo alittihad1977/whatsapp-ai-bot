@@ -20,7 +20,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ======================================================
-// Gemini
+// Gemini AI
 // ======================================================
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -125,9 +125,7 @@ const AR_MONTHS = [
 // استخراج الوقت والتاريخ من توقيت سوريا
 // ======================================================
 
-function getSyriaParts(
-  date = new Date()
-) {
+function getSyriaParts(date = new Date()) {
 
   const parts =
     new Intl.DateTimeFormat(
@@ -250,7 +248,6 @@ function isFriday(
 
 // ======================================================
 // هل المكتب مفتوح حالياً؟
-/* يعتمد حصراً على توقيت سوريا */
 // ======================================================
 
 function isOpenNow(
@@ -373,6 +370,10 @@ function getCurrentStatusText() {
     `انتهى الدوام اليوم الساعة 6 مساءً.`
   );
 }
+
+// ======================================================
+// التاريخ
+// ======================================================
 
 function getTodayDate() {
 
@@ -621,13 +622,20 @@ function isVoiceMessage(
       ?.audioMessage
   );
 }
+
 // ======================================================
 // ردود الشركة
 // ======================================================
 
-function buildReply(type, originalMessage = "") {
+function buildReply(
+  type,
+  originalMessage = ""
+) {
+
   switch (type) {
+
     case "greeting":
+
       return {
         reply:
           "أهلاً وسهلاً بك 🌹 كيف يمكنني مساعدتك؟",
@@ -635,6 +643,7 @@ function buildReply(type, originalMessage = "") {
       };
 
     case "identity":
+
       return {
         reply:
           "أهلاً وسهلاً بك 🌹\nأنا المساعد الذكي لشركة الاتحاد للصرافة والحوالات، وجاهز لمساعدتك باستفساراتك.",
@@ -642,6 +651,7 @@ function buildReply(type, originalMessage = "") {
       };
 
     case "thanks":
+
       return {
         reply:
           "العفو 🌹 أهلاً وسهلاً بك دائماً.",
@@ -649,6 +659,7 @@ function buildReply(type, originalMessage = "") {
       };
 
     case "location":
+
       return {
         reply:
           "📍 موقع مكتب الشعار:\n" +
@@ -659,17 +670,23 @@ function buildReply(type, originalMessage = "") {
       };
 
     case "branches":
+
       return {
         reply:
           "🏢 أفرع شركة الاتحاد:\n\n" +
-          "1- " + COMPANY.branches[0] + "\n" +
-          "2- " + COMPANY.branches[1] + "\n\n" +
+          "1- " +
+          COMPANY.branches[0] +
+          "\n" +
+          "2- " +
+          COMPANY.branches[1] +
+          "\n\n" +
           COMPANY.mainBranch,
         type
       };
 
     case "working_hours":
     case "open_now":
+
       return {
         reply:
           "⏱️ " +
@@ -681,7 +698,9 @@ function buildReply(type, originalMessage = "") {
       };
 
     case "current_time": {
-      const now = getSyriaNow();
+
+      const now =
+        getSyriaNow();
 
       return {
         reply:
@@ -692,32 +711,50 @@ function buildReply(type, originalMessage = "") {
     }
 
     case "current_date": {
-      const now = getSyriaNow();
+
+      const now =
+        getSyriaNow();
 
       return {
         reply:
           `📅 تاريخ اليوم في سوريا: ${now.dayName} ${now.dateText}.\n` +
-          (isFriday(now)
-            ? "اليوم الجمعة عطلة رسمية."
-            : isSpecialHoliday(now.isoDate)
-              ? SPECIAL_HOLIDAYS[now.isoDate]
-              : "اليوم ليس عطلة الجمعة."),
+          (
+            isFriday(now)
+              ? "اليوم الجمعة عطلة رسمية."
+              : isSpecialHoliday(
+                  now.isoDate
+                )
+                  ? SPECIAL_HOLIDAYS[
+                      now.isoDate
+                    ]
+                  : "اليوم ليس عطلة الجمعة."
+          ),
         type
       };
     }
 
     case "schedule": {
-      const now = getSyriaNow();
-      const text = normalizeText(originalMessage);
 
-      if (/بكرا|غدا|غداً/.test(text)) {
-        const nextDate = new Date(
-          Date.UTC(
-            now.year,
-            now.month - 1,
-            now.day + 1
-          )
+      const now =
+        getSyriaNow();
+
+      const text =
+        normalizeText(
+          originalMessage
         );
+
+      if (
+        /بكرا|غدا|غداً/.test(text)
+      ) {
+
+        const nextDate =
+          new Date(
+            Date.UTC(
+              now.year,
+              now.month - 1,
+              now.day + 1
+            )
+          );
 
         const y =
           nextDate.getUTCFullYear();
@@ -735,6 +772,7 @@ function buildReply(type, originalMessage = "") {
           `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 
         if (w === 5) {
+
           return {
             reply:
               `📅 بكرا ${AR_DAYS[w]} ${d} ${AR_MONTHS[m - 1]} ${y}، والجمعة عطلة رسمية.`,
@@ -742,11 +780,18 @@ function buildReply(type, originalMessage = "") {
           };
         }
 
-        if (isSpecialHoliday(iso)) {
+        if (
+          isSpecialHoliday(
+            iso
+          )
+        ) {
+
           return {
             reply:
               `📅 بكرا ${AR_DAYS[w]} ${d} ${AR_MONTHS[m - 1]} ${y} عطلة رسمية.\n` +
-              SPECIAL_HOLIDAYS[iso],
+              SPECIAL_HOLIDAYS[
+                iso
+              ],
             type
           };
         }
@@ -766,6 +811,7 @@ function buildReply(type, originalMessage = "") {
     }
 
     case "rates":
+
       return {
         reply:
           "💰 لمعرفة أسعار الصرف الحالية، يمكنك متابعة قنوات الأسعار الرسمية لشركة الاتحاد:\n\n" +
@@ -778,6 +824,7 @@ function buildReply(type, originalMessage = "") {
       };
 
     case "transfer_check":
+
       return {
         reply:
           "📋 يرجى إرسال إشعار الحوالة، وسيقوم القسم المختص بالتحقق منه والرد عليك بأسرع وقت.",
@@ -785,6 +832,7 @@ function buildReply(type, originalMessage = "") {
       };
 
     case "transfer_notice":
+
       return {
         reply:
           "📋 تم استلام المعلومات، وسيقوم القسم المختص بالتحقق منها والرد عليك بأسرع وقت.",
@@ -792,6 +840,7 @@ function buildReply(type, originalMessage = "") {
       };
 
     case "documents":
+
       return {
         reply:
           "🪪 لاستلام الحوالة يجب إبراز إحدى الوثائق الأصلية التالية حصراً:\n\n" +
@@ -803,6 +852,7 @@ function buildReply(type, originalMessage = "") {
       };
 
     case "sham_cash":
+
       return {
         reply:
           "نعتذر منك 🌹 لا يوجد لدينا تعامل أو تسليم حوالات عن طريق شام كاش.",
@@ -810,6 +860,7 @@ function buildReply(type, originalMessage = "") {
       };
 
     case "receiver_change":
+
       return {
         reply:
           "📋 تسليم الحوالة يكون باليد لصاحب العلاقة حصراً.\n\n" +
@@ -818,6 +869,7 @@ function buildReply(type, originalMessage = "") {
       };
 
     case "later_collection":
+
       return {
         reply:
           "📋 تبقى الحوالة موجودة حتى يأتي صاحب العلاقة ليستلمها، أو يمكن للمرسل استعادة المبلغ.",
@@ -825,6 +877,7 @@ function buildReply(type, originalMessage = "") {
       };
 
     case "complaint":
+
       return {
         reply:
           "🌹 أكيد، اشرح لنا المشكلة بالتفصيل كتابةً، ليتم رفعها ومتابعتها مع المختص.",
@@ -832,6 +885,7 @@ function buildReply(type, originalMessage = "") {
       };
 
     case "voice":
+
       return {
         reply:
           "🌹 عذراً، يرجى كتابة استفسارك نصياً حتى أتمكن من مساعدتك.",
@@ -839,6 +893,7 @@ function buildReply(type, originalMessage = "") {
       };
 
     default:
+
       return {
         reply:
           "🌹 أهلاً بك. يرجى توضيح استفسارك أكثر حتى نتمكن من مساعدتك.",
@@ -848,15 +903,18 @@ function buildReply(type, originalMessage = "") {
 }
 
 // ======================================================
-// AI Router
+// AI Router - Gemini
 // ======================================================
 
-async function aiRouter(message) {
+async function aiRouter(
+  message
+) {
 
   const text =
     String(message || "").trim();
 
   if (!text) {
+
     return {
       type: "greeting",
       confidence: 1
@@ -864,7 +922,10 @@ async function aiRouter(message) {
   }
 
   if (!ai) {
-    return fallbackRouter(text);
+
+    return fallbackRouter(
+      text
+    );
   }
 
   const now =
@@ -1025,43 +1086,24 @@ ${text}
     const allowedTypes = [
 
       "greeting",
-
       "identity",
-
       "thanks",
-
       "location",
-
       "branches",
-
       "working_hours",
-
       "open_now",
-
       "current_time",
-
       "current_date",
-
       "schedule",
-
       "rates",
-
       "transfer_check",
-
       "transfer_notice",
-
       "documents",
-
       "sham_cash",
-
       "receiver_change",
-
       "later_collection",
-
       "complaint",
-
       "voice",
-
       "unknown"
 
     ];
@@ -1076,16 +1118,18 @@ ${text}
         type: "unknown",
         confidence: 0
       };
-
     }
 
     return {
-      type: result.type,
+
+      type:
+        result.type,
 
       confidence:
         Number(
           result.confidence
         ) || 0
+
     };
 
   } catch (error) {
@@ -1095,7 +1139,9 @@ ${text}
       error.message
     );
 
-    return fallbackRouter(text);
+    return fallbackRouter(
+      text
+    );
   }
 }
 
@@ -1103,7 +1149,9 @@ ${text}
 // Router احتياطي
 // ======================================================
 
-function fallbackRouter(message) {
+function fallbackRouter(
+  message
+) {
 
   const text =
     normalizeText(message);
@@ -1117,7 +1165,6 @@ function fallbackRouter(message) {
       type: "identity",
       confidence: 0.95
     };
-
   }
 
   if (
@@ -1129,7 +1176,6 @@ function fallbackRouter(message) {
       type: "greeting",
       confidence: 0.8
     };
-
   }
 
   if (
@@ -1141,7 +1187,6 @@ function fallbackRouter(message) {
       type: "thanks",
       confidence: 0.8
     };
-
   }
 
   if (
@@ -1153,7 +1198,6 @@ function fallbackRouter(message) {
       type: "current_time",
       confidence: 0.95
     };
-
   }
 
   if (
@@ -1165,7 +1209,6 @@ function fallbackRouter(message) {
       type: "current_date",
       confidence: 0.95
     };
-
   }
 
   if (
@@ -1177,7 +1220,6 @@ function fallbackRouter(message) {
       type: "schedule",
       confidence: 0.95
     };
-
   }
 
   if (
@@ -1189,7 +1231,6 @@ function fallbackRouter(message) {
       type: "open_now",
       confidence: 0.95
     };
-
   }
 
   if (
@@ -1201,7 +1242,6 @@ function fallbackRouter(message) {
       type: "location",
       confidence: 0.9
     };
-
   }
 
   if (
@@ -1213,7 +1253,6 @@ function fallbackRouter(message) {
       type: "branches",
       confidence: 0.9
     };
-
   }
 
   if (
@@ -1225,7 +1264,6 @@ function fallbackRouter(message) {
       type: "working_hours",
       confidence: 0.9
     };
-
   }
 
   if (
@@ -1237,7 +1275,6 @@ function fallbackRouter(message) {
       type: "rates",
       confidence: 0.8
     };
-
   }
 
   if (
@@ -1249,7 +1286,6 @@ function fallbackRouter(message) {
       type: "transfer_check",
       confidence: 0.85
     };
-
   }
 
   if (
@@ -1261,7 +1297,6 @@ function fallbackRouter(message) {
       type: "documents",
       confidence: 0.85
     };
-
   }
 
   if (
@@ -1273,7 +1308,6 @@ function fallbackRouter(message) {
       type: "sham_cash",
       confidence: 0.95
     };
-
   }
 
   if (
@@ -1285,7 +1319,6 @@ function fallbackRouter(message) {
       type: "receiver_change",
       confidence: 0.85
     };
-
   }
 
   if (
@@ -1297,7 +1330,6 @@ function fallbackRouter(message) {
       type: "complaint",
       confidence: 0.9
     };
-
   }
 
   return {
@@ -1305,14 +1337,19 @@ function fallbackRouter(message) {
     confidence: 0.2
   };
 }
+
 // ======================================================
 // الوظيفة الرئيسية للـAI
 // ======================================================
 
-async function generateAIReply(message) {
+async function generateAIReply(
+  message
+) {
 
   const route =
-    await aiRouter(message);
+    await aiRouter(
+      message
+    );
 
   const result =
     buildReply(
@@ -1321,9 +1358,12 @@ async function generateAIReply(message) {
     );
 
   return {
+
     ...result,
+
     confidence:
       route.confidence
+
   };
 }
 
@@ -1332,8 +1372,12 @@ async function generateAIReply(message) {
 // ======================================================
 
 let sock = null;
+
 let whatsappQR = null;
-let whatsappStatus = "disconnected";
+
+let whatsappStatus =
+  "disconnected";
+
 let whatsappJid = null;
 
 const AUTH_DIR =
@@ -1373,11 +1417,13 @@ async function startWhatsApp() {
     sock =
       makeWASocket({
 
-        auth: state,
+        auth:
+          state,
 
         logger:
           P({
-            level: "silent"
+            level:
+              "silent"
           }),
 
         browser:
@@ -1408,7 +1454,9 @@ async function startWhatsApp() {
 
     sock.ev.on(
       "connection.update",
-      async (update) => {
+      async (
+        update
+      ) => {
 
         const {
           connection,
@@ -1422,7 +1470,8 @@ async function startWhatsApp() {
 
         if (qr) {
 
-          whatsappQR = qr;
+          whatsappQR =
+            qr;
 
           whatsappStatus =
             "qr_ready";
@@ -1434,7 +1483,6 @@ async function startWhatsApp() {
           console.log(
             "Open /qr to scan the QR code."
           );
-
         }
 
         // ----------------------------------------------
@@ -1449,7 +1497,8 @@ async function startWhatsApp() {
           whatsappStatus =
             "connected";
 
-          whatsappQR = null;
+          whatsappQR =
+            null;
 
           whatsappJid =
             sock?.user?.id ||
@@ -1471,11 +1520,10 @@ async function startWhatsApp() {
           console.log(
             "======================================"
           );
-
         }
 
         // ----------------------------------------------
-        // الاتصال انقطع
+        // انقطع الاتصال
         // ----------------------------------------------
 
         if (
@@ -1518,7 +1566,9 @@ async function startWhatsApp() {
 
             setTimeout(
               () => {
+
                 startWhatsApp();
+
               },
               5000
             );
@@ -1550,7 +1600,8 @@ async function startWhatsApp() {
       }) => {
 
         if (
-          type !== "notify"
+          type !==
+          "notify"
         ) {
           return;
         }
@@ -1566,7 +1617,9 @@ async function startWhatsApp() {
               message
             );
 
-          } catch (error) {
+          } catch (
+            error
+          ) {
 
             console.log(
               "WhatsApp message error:",
@@ -1574,13 +1627,14 @@ async function startWhatsApp() {
             );
 
           }
-
         }
 
       }
     );
 
-  } catch (error) {
+  } catch (
+    error
+  ) {
 
     console.log(
       "WhatsApp startup error:",
@@ -1592,7 +1646,9 @@ async function startWhatsApp() {
 
     setTimeout(
       () => {
+
         startWhatsApp();
+
       },
       10000
     );
@@ -1640,7 +1696,7 @@ async function handleWhatsAppMessage(
   }
 
   // ----------------------------------------------------
-  // النص
+  // استخراج النص
   // ----------------------------------------------------
 
   let text =
@@ -1659,10 +1715,6 @@ async function handleWhatsAppMessage(
   ) {
 
     text = "";
-
-    // يمكن لاحقاً إضافة
-    // تحويل الصوت إلى نص
-    // باستخدام خدمة Speech-to-Text.
 
     const allowed =
       checkWhatsAppPermission(
@@ -1817,9 +1869,6 @@ function checkWhatsAppPermission(
       return false;
     }
 
-    // إذا كانت الإعدادات
-    // تتطلب ذكر البوت داخل المجموعة
-
     if (
       groupOnlyWhenMentioned()
     ) {
@@ -1842,7 +1891,10 @@ function checkWhatsAppPermission(
 
 app.get(
   "/qr",
-  async (req, res) => {
+  async (
+    req,
+    res
+  ) => {
 
     if (
       whatsappStatus ===
@@ -1852,10 +1904,14 @@ app.get(
       return res.send(`
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
+
 <head>
+
 <meta charset="UTF-8">
+
 <meta name="viewport"
 content="width=device-width,initial-scale=1">
+
 <title>WhatsApp Connected</title>
 
 <style>
@@ -1896,6 +1952,7 @@ h1 {
 }
 
 </style>
+
 </head>
 
 <body>
@@ -1926,6 +1983,7 @@ ${whatsappJid || "-"}
 </div>
 
 </body>
+
 </html>
       `);
     }
@@ -1934,9 +1992,13 @@ ${whatsappJid || "-"}
 
       return res.send(`
 <!DOCTYPE html>
+
 <html lang="ar" dir="rtl">
+
 <head>
+
 <meta charset="UTF-8">
+
 <meta name="viewport"
 content="width=device-width,initial-scale=1">
 
@@ -1985,6 +2047,7 @@ body {
 </div>
 
 </body>
+
 </html>
       `);
     }
@@ -2002,6 +2065,7 @@ body {
 
       res.send(`
 <!DOCTYPE html>
+
 <html lang="ar" dir="rtl">
 
 <head>
@@ -2010,6 +2074,9 @@ body {
 
 <meta name="viewport"
 content="width=device-width,initial-scale=1">
+
+<meta http-equiv="refresh"
+content="15">
 
 <title>ربط واتساب</title>
 
@@ -2125,13 +2192,409 @@ alt="WhatsApp QR"
 </html>
       `);
 
-    } catch (error) {
+    } catch (
+      error
+    ) {
+
+      console.error(
+        "QR ERROR:",
+        error.message
+      );
 
       res.status(500).send(
         "تعذر إنشاء QR"
       );
-
     }
+
+  }
+);
+
+// ======================================================
+// اختبار Gemini AI
+// ======================================================
+
+app.get(
+  "/ai-test",
+  async (
+    req,
+    res
+  ) => {
+
+    try {
+
+      const question =
+        req.query.q ||
+        "مرحبا، عرفني بنفسك باختصار";
+
+      if (!ai) {
+
+        return res.status(500).send(`
+<!DOCTYPE html>
+
+<html lang="ar" dir="rtl">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport"
+content="width=device-width,initial-scale=1">
+
+<title>اختبار AI</title>
+
+</head>
+
+<body style="
+font-family:Arial;
+padding:30px;
+background:#f5f5f5;
+">
+
+<h2>
+❌ Gemini AI غير مفعل
+</h2>
+
+<p>
+تأكد من إضافة GEMINI_API_KEY في Environment Variables في Render.
+</p>
+
+</body>
+
+</html>
+        `);
+      }
+
+      const response =
+        await ai.models.generateContent({
+
+          model:
+            "gemini-2.5-flash",
+
+          contents:
+            question,
+
+          config: {
+            temperature: 0.2
+          }
+
+        });
+
+      const answer =
+        response.text ||
+        "لم يتم الحصول على رد.";
+
+      const safeQuestion =
+        String(question)
+          .replace(
+            /&/g,
+            "&amp;"
+          )
+          .replace(
+            /</g,
+            "&lt;"
+          )
+          .replace(
+            />/g,
+            "&gt;"
+          );
+
+      const safeAnswer =
+        String(answer)
+          .replace(
+            /&/g,
+            "&amp;"
+          )
+          .replace(
+            /</g,
+            "&lt;"
+          )
+          .replace(
+            />/g,
+            "&gt;"
+          )
+          .replace(
+            /\n/g,
+            "<br>"
+          );
+
+      res.send(`
+<!DOCTYPE html>
+
+<html lang="ar" dir="rtl">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport"
+content="width=device-width,initial-scale=1">
+
+<title>اختبار Gemini AI</title>
+
+<style>
+
+body {
+  font-family: Arial, sans-serif;
+  background: #f3f4f6;
+  padding: 25px;
+}
+
+.box {
+  max-width: 700px;
+  margin: auto;
+  background: white;
+  padding: 25px;
+  border-radius: 18px;
+  box-shadow:
+    0 5px 25px
+    rgba(0,0,0,.08);
+}
+
+.question {
+  background: #eee;
+  padding: 15px;
+  border-radius: 10px;
+}
+
+.answer {
+  background: #e9f7ef;
+  padding: 15px;
+  border-radius: 10px;
+  line-height: 1.8;
+}
+
+a {
+  display: inline-block;
+  margin-top: 20px;
+  padding: 12px 18px;
+  background: #222;
+  color: white;
+  text-decoration: none;
+  border-radius: 10px;
+}
+
+input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  margin-top: 10px;
+}
+
+button {
+  width: 100%;
+  padding: 12px;
+  margin-top: 10px;
+  background: #222;
+  color: white;
+  border: 0;
+  border-radius: 10px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="box">
+
+<h1>
+🤖 اختبار Gemini AI
+</h1>
+
+<form method="GET" action="/ai-test">
+
+<input
+type="text"
+name="q"
+value="${safeQuestion}"
+placeholder="اكتب سؤالك هنا..."
+>
+
+<button type="submit">
+اختبار AI
+</button>
+
+</form>
+
+<h3>
+السؤال:
+</h3>
+
+<div class="question">
+${safeQuestion}
+</div>
+
+<h3>
+رد الذكاء الاصطناعي:
+</h3>
+
+<div class="answer">
+${safeAnswer}
+</div>
+
+<a href="/status">
+📊 حالة السيرفر
+</a>
+
+<a href="/">
+🏠 الصفحة الرئيسية
+</a>
+
+</div>
+
+</body>
+
+</html>
+      `);
+
+    } catch (
+      error
+    ) {
+
+      console.error(
+        "AI TEST ERROR:",
+        error
+      );
+
+      res.status(500).send(`
+<!DOCTYPE html>
+
+<html lang="ar" dir="rtl">
+
+<head>
+
+<meta charset="UTF-8">
+
+<title>AI Error</title>
+
+</head>
+
+<body style="
+font-family:Arial;
+padding:30px;
+">
+
+<h2>
+❌ خطأ في Gemini AI
+</h2>
+
+<pre>
+${String(error.message)
+  .replace(
+    /&/g,
+    "&amp;"
+  )
+  .replace(
+    /</g,
+    "&lt;"
+  )
+  .replace(
+    />/g,
+    "&gt;"
+  )}
+</pre>
+
+<p>
+تأكد من GEMINI_API_KEY ومن إعدادات Render.
+</p>
+
+</body>
+
+</html>
+      `);
+    }
+
+  }
+);
+
+// ======================================================
+// STATUS
+// ======================================================
+
+app.get(
+  "/status",
+  (req, res) => {
+
+    const uptime =
+      process.uptime();
+
+    const hours =
+      Math.floor(
+        uptime / 3600
+      );
+
+    const minutes =
+      Math.floor(
+        (uptime % 3600) / 60
+      );
+
+    const seconds =
+      Math.floor(
+        uptime % 60
+      );
+
+    const syriaNow =
+      getSyriaNow();
+
+    res.json({
+
+      status:
+        "online",
+
+      bot:
+        "مساعد شركة الاتحاد",
+
+      enabled:
+        true,
+
+      company:
+        COMPANY.name,
+
+      branch:
+        "مكتب الشعار",
+
+      workingHours:
+        COMPANY.workingHours,
+
+      officialHoliday:
+        "الجمعة",
+
+      officeOpenNow:
+        isOpenNow(
+          syriaNow
+        ),
+
+      ai:
+        !!ai,
+
+      aiProvider:
+        "Google Gemini",
+
+      whatsapp:
+        whatsappStatus,
+
+      whatsappConnected:
+        whatsappStatus ===
+        "connected",
+
+      whatsappJid:
+        whatsappJid,
+
+      uptime:
+        `${hours}h ${minutes}m ${seconds}s`,
+
+      syriaTime:
+        syriaNow,
+
+      serverTime:
+        new Date().toISOString(),
+
+      timestamp:
+        Date.now()
+
+    });
 
   }
 );
@@ -2144,6 +2607,9 @@ app.get(
   "/",
   (req, res) => {
 
+    const now =
+      getSyriaNow();
+
     res.send(`
 <!DOCTYPE html>
 
@@ -2154,9 +2620,11 @@ app.get(
 <meta charset="UTF-8">
 
 <meta name="viewport"
-content="width=device-width, initial-scale=1">
+content="width=device-width,initial-scale=1">
 
-<title>مساعد شركة الاتحاد</title>
+<title>
+مساعد شركة الاتحاد
+</title>
 
 <style>
 
@@ -2165,49 +2633,85 @@ content="width=device-width, initial-scale=1">
 }
 
 body {
-  font-family: Arial, sans-serif;
-  background: #f3f4f6;
+
   margin: 0;
-  padding: 20px;
+
+  padding: 25px;
+
+  font-family: Arial, sans-serif;
+
+  background: #f3f4f6;
+
 }
 
 .container {
+
   max-width: 650px;
+
   margin: auto;
+
 }
 
 .card {
+
   background: white;
-  padding: 22px;
-  border-radius: 16px;
+
+  padding: 25px;
+
+  border-radius: 18px;
+
   box-shadow:
-    0 4px 18px
+    0 5px 25px
     rgba(0,0,0,.08);
+
 }
 
 h1 {
   margin-top: 0;
 }
 
-.links {
-  display: grid;
-  gap: 10px;
-  margin-top: 20px;
+.status {
+
+  padding: 14px;
+
+  border-radius: 10px;
+
+  margin: 12px 0;
+
+  background: #f5f5f5;
+
 }
 
 a {
+
   display: block;
-  text-decoration: none;
+
   padding: 14px;
+
+  margin-top: 12px;
+
   border-radius: 10px;
+
   background: #222;
+
   color: white;
+
+  text-decoration: none;
+
+  text-align: center;
+
 }
 
-.status {
-  padding: 10px;
-  border-radius: 8px;
-  margin-bottom: 15px;
+.time {
+
+  background: #eef8ff;
+
+  padding: 15px;
+
+  border-radius: 10px;
+
+  line-height: 1.8;
+
 }
 
 </style>
@@ -2226,33 +2730,75 @@ a {
 
 <div class="status">
 
-${whatsappStatus === "connected"
-  ? "🟢 واتساب متصل"
-  : whatsappStatus === "qr_ready"
-    ? "🟡 بانتظار ربط واتساب"
-    : "🔴 واتساب غير متصل"}
+${
+  whatsappStatus ===
+  "connected"
+
+    ? "🟢 واتساب متصل"
+
+    : whatsappStatus ===
+      "qr_ready"
+
+      ? "🟡 بانتظار مسح QR"
+
+      : "🔴 واتساب غير متصل"
+}
+
+</div>
+
+<div class="status">
+
+${
+  ai
+    ? "🟢 Gemini AI يعمل"
+    : "🔴 Gemini AI غير مفعل"
+}
+
+</div>
+
+<div class="time">
+
+🕐 الساعة في سوريا:
+<b>
+${now.timeText}
+</b>
+
+<br>
+
+📅 التاريخ:
+<b>
+${now.dayName}
+${now.dateText}
+</b>
+
+<br>
+
+🏢 حالة المكتب:
+<b>
+${
+  isOpenNow(now)
+    ? "مفتوح حالياً 🟢"
+    : "مغلق حالياً 🔴"
+}
+</b>
 
 </div>
 
 <p>
-مساعد ذكي لخدمة عملاء شركة الاتحاد.
+شركة الاتحاد - مكتب الشعار للصرافة والحوالات
 </p>
-
-<div class="links">
 
 <a href="/qr">
 📱 ربط واتساب / QR
 </a>
 
-<a href="/test">
+<a href="/ai-test">
 🤖 اختبار الذكاء الاصطناعي
 </a>
 
 <a href="/status">
-📊 حالة البوت
+📊 حالة السيرفر
 </a>
-
-</div>
 
 </div>
 
@@ -2261,317 +2807,112 @@ ${whatsappStatus === "connected"
 </body>
 
 </html>
-    `);
+  `);
 
   }
 );
-// ===============================
-// 4/4 - AI TEST + STATUS + START
-// ===============================
 
-// صفحة اختبار الذكاء الاصطناعي
-app.get("/ai-test", async (req, res) => {
-  try {
-    const question =
-      req.query.q ||
-      "مرحبا، عرفني بنفسك باختصار";
+// ======================================================
+// ERROR HANDLER
+// ======================================================
 
-    if (!process.env.OPENAI_API_KEY) {
-      return res.status(500).send(`
-        <html lang="ar" dir="rtl">
-        <meta charset="UTF-8">
-        <body style="font-family:Arial;padding:30px">
-          <h2>❌ مفتاح OpenAI غير موجود</h2>
-          <p>تأكد من إضافة OPENAI_API_KEY في Environment Variables.</p>
-        </body>
-        </html>
-      `);
-    }
+app.use(
+  (
+    err,
+    req,
+    res,
+    next
+  ) => {
 
-    const response = await openai.responses.create({
-      model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-      input: question
+    console.error(
+      "SERVER ERROR:",
+      err
+    );
+
+    res.status(500).json({
+
+      error:
+        true,
+
+      message:
+        "حدث خطأ في السيرفر"
+
     });
 
-    const answer = response.output_text || "لم يتم الحصول على رد.";
-
-    res.send(`
-      <!DOCTYPE html>
-      <html lang="ar" dir="rtl">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width,initial-scale=1">
-        <title>اختبار AI</title>
-        <style>
-          body {
-            font-family: Arial;
-            background:#f5f5f5;
-            padding:25px;
-          }
-
-          .box {
-            max-width:700px;
-            margin:auto;
-            background:white;
-            padding:25px;
-            border-radius:15px;
-            box-shadow:0 4px 20px rgba(0,0,0,.08);
-          }
-
-          h1 {
-            margin-top:0;
-          }
-
-          .question {
-            background:#eee;
-            padding:15px;
-            border-radius:10px;
-            margin-bottom:15px;
-          }
-
-          .answer {
-            background:#e9f7ef;
-            padding:15px;
-            border-radius:10px;
-            line-height:1.8;
-          }
-
-          a {
-            display:inline-block;
-            margin-top:20px;
-            padding:10px 15px;
-            background:#111;
-            color:white;
-            text-decoration:none;
-            border-radius:8px;
-          }
-        </style>
-      </head>
-
-      <body>
-        <div class="box">
-          <h1>🤖 اختبار الذكاء الاصطناعي</h1>
-
-          <h3>السؤال:</h3>
-          <div class="question">
-            ${String(question)
-              .replace(/&/g, "&amp;")
-              .replace(/</g, "&lt;")
-              .replace(/>/g, "&gt;")}
-          </div>
-
-          <h3>رد AI:</h3>
-          <div class="answer">
-            ${String(answer)
-              .replace(/&/g, "&amp;")
-              .replace(/</g, "&lt;")
-              .replace(/>/g, "&gt;")
-              .replace(/\n/g, "<br>")}
-          </div>
-
-          <a href="/status">فحص حالة السيرفر</a>
-        </div>
-      </body>
-      </html>
-    `);
-
-  } catch (error) {
-    console.error("AI TEST ERROR:", error);
-
-    res.status(500).send(`
-      <html lang="ar" dir="rtl">
-      <meta charset="UTF-8">
-      <body style="font-family:Arial;padding:30px">
-        <h2>❌ خطأ في اختبار AI</h2>
-        <pre>${String(error.message)
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")}</pre>
-      </body>
-      </html>
-    `);
   }
-});
+);
 
+// ======================================================
+// تشغيل السيرفر
+// ======================================================
+// ملاحظة مهمة:
+// PORT معرف مرة واحدة فقط في أعلى الملف.
+// لا نعيد تعريفه هنا.
+// ======================================================
 
-// ===============================
-// STATUS
-// ===============================
+app.listen(
+  PORT,
+  async () => {
 
-app.get("/status", (req, res) => {
+    console.log(
+      "======================================"
+    );
 
-  const uptime = process.uptime();
+    console.log(
+      "🚀 SERVER STARTED"
+    );
 
-  const hours = Math.floor(uptime / 3600);
-  const minutes = Math.floor((uptime % 3600) / 60);
-  const seconds = Math.floor(uptime % 60);
+    console.log(
+      "======================================"
+    );
 
-  res.json({
-    status: "online",
-    bot: "مساعد شركة الاتحاد",
-    enabled: true,
+    console.log(
+      "📡 Port:",
+      PORT
+    );
 
-    company: "شركة الاتحاد - مكتب الشعار للصرافة والحوالات",
+    console.log(
+      "📊 Status: /status"
+    );
 
-    branch: "مكتب الشعار",
+    console.log(
+      "📱 WhatsApp: /qr"
+    );
 
-    workingHours: "من 10 صباحاً حتى 6 مساءً",
+    console.log(
+      "🤖 AI Test: /ai-test"
+    );
 
-    officialHoliday: "الجمعة",
+    console.log(
+      "======================================"
+    );
 
-    ai: !!process.env.OPENAI_API_KEY,
+    // ------------------------------------------
+    // بدء واتساب
+    // ------------------------------------------
 
-    whatsapp: typeof sock !== "undefined" && !!sock,
+    try {
 
-    uptime: `${hours}h ${minutes}m ${seconds}s`,
-
-    serverTime: new Date().toISOString(),
-
-    timestamp: Date.now()
-  });
-});
-
-
-// ===============================
-// ROOT
-// ===============================
-
-app.get("/", (req, res) => {
-  res.send(`
-    <!DOCTYPE html>
-    <html lang="ar" dir="rtl">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width,initial-scale=1">
-      <title>مساعد شركة الاتحاد</title>
-
-      <style>
-        body {
-          font-family: Arial;
-          background:#f5f5f5;
-          text-align:center;
-          padding:40px 20px;
-        }
-
-        .box {
-          max-width:600px;
-          margin:auto;
-          background:white;
-          padding:30px;
-          border-radius:20px;
-          box-shadow:0 5px 25px rgba(0,0,0,.08);
-        }
-
-        h1 {
-          margin-bottom:10px;
-        }
-
-        .online {
-          color:green;
-          font-weight:bold;
-          font-size:20px;
-        }
-
-        a {
-          display:block;
-          margin:15px auto;
-          max-width:300px;
-          padding:13px;
-          background:#111;
-          color:white;
-          text-decoration:none;
-          border-radius:10px;
-        }
-      </style>
-    </head>
-
-    <body>
-
-      <div class="box">
-
-        <h1>🤖 مساعد شركة الاتحاد</h1>
-
-        <p class="online">● السيرفر يعمل</p>
-
-        <p>
-          شركة الاتحاد للصرافة والحوالات المالية
-        </p>
-
-        <a href="/status">
-          📊 حالة السيرفر
-        </a>
-
-        <a href="/ai-test">
-          🤖 اختبار الذكاء الاصطناعي
-        </a>
-
-      </div>
-
-    </body>
-    </html>
-  `);
-});
-
-
-// ===============================
-// ERROR HANDLER
-// ===============================
-
-app.use((err, req, res, next) => {
-
-  console.error("SERVER ERROR:", err);
-
-  res.status(500).json({
-    error: true,
-    message: "حدث خطأ في السيرفر"
-  });
-
-});
-
-
-// ===============================
-// START SERVER
-// ===============================
-
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, async () => {
-
-  console.log("=================================");
-  console.log("🚀 SERVER STARTED");
-  console.log("=================================");
-  console.log(`📡 Port: ${PORT}`);
-  console.log(`🌐 URL: http://localhost:${PORT}`);
-  console.log(`📊 Status: /status`);
-  console.log(`🤖 AI Test: /ai-test`);
-  console.log("=================================");
-
-  // بدء واتساب
-  try {
-
-    if (typeof startWhatsApp === "function") {
-
-      console.log("📱 Starting WhatsApp...");
+      console.log(
+        "📱 Starting WhatsApp..."
+      );
 
       await startWhatsApp();
 
-      console.log("✅ WhatsApp startup completed");
-
-    } else {
-
       console.log(
-        "⚠️ startWhatsApp() غير موجود، تم تشغيل السيرفر بدون واتساب"
+        "✅ WhatsApp startup completed"
+      );
+
+    } catch (
+      error
+    ) {
+
+      console.error(
+        "❌ WhatsApp startup error:",
+        error.message
       );
 
     }
 
-  } catch (error) {
-
-    console.error(
-      "❌ WhatsApp startup error:",
-      error.message
-    );
-
   }
-
-});
+);
