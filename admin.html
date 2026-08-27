@@ -1,0 +1,1201 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta
+  name="viewport"
+  content="width=device-width,initial-scale=1"
+>
+
+<title>إدارة معرفة علي</title>
+
+<style>
+
+*{
+  box-sizing:border-box;
+}
+
+body{
+  margin:0;
+  font-family:Arial,Tahoma,sans-serif;
+  background:#f3f5f7;
+  color:#222;
+}
+
+header{
+  background:#111827;
+  color:white;
+  padding:22px;
+  text-align:center;
+}
+
+header h1{
+  margin:0 0 8px;
+}
+
+header p{
+  margin:0;
+  opacity:.8;
+}
+
+.container{
+  width:min(1100px,94%);
+  margin:25px auto 60px;
+}
+
+.card{
+  background:white;
+  border-radius:18px;
+  padding:22px;
+  margin-bottom:20px;
+  box-shadow:0 5px 20px rgba(0,0,0,.08);
+}
+
+.card h2{
+  margin-top:0;
+  border-bottom:1px solid #eee;
+  padding-bottom:12px;
+}
+
+label{
+  display:block;
+  font-weight:bold;
+  margin:12px 0 7px;
+}
+
+input,
+textarea{
+  width:100%;
+  border:1px solid #d5d9df;
+  border-radius:10px;
+  padding:12px;
+  font-size:16px;
+  outline:none;
+  font-family:inherit;
+}
+
+textarea{
+  min-height:110px;
+  resize:vertical;
+}
+
+input:focus,
+textarea:focus{
+  border-color:#111827;
+}
+
+.grid{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:15px;
+}
+
+@media(max-width:700px){
+  .grid{
+    grid-template-columns:1fr;
+  }
+}
+
+.item{
+  background:#f8fafc;
+  border:1px solid #e5e7eb;
+  border-radius:12px;
+  padding:15px;
+  margin-bottom:10px;
+}
+
+.item-row{
+  display:flex;
+  gap:8px;
+  align-items:flex-start;
+}
+
+.item-row textarea{
+  flex:1;
+}
+
+button{
+  border:0;
+  border-radius:10px;
+  padding:12px 18px;
+  cursor:pointer;
+  font-size:15px;
+  font-family:inherit;
+}
+
+.add{
+  background:#e5e7eb;
+}
+
+.save{
+  background:#111827;
+  color:white;
+  width:100%;
+  font-size:18px;
+  padding:16px;
+}
+
+.delete{
+  background:#fee2e2;
+}
+
+.status{
+  display:none;
+  padding:15px;
+  border-radius:10px;
+  margin-bottom:20px;
+  font-weight:bold;
+}
+
+.success{
+  background:#dcfce7;
+  color:#166534;
+}
+
+.error{
+  background:#fee2e2;
+  color:#991b1b;
+}
+
+.login{
+  max-width:450px;
+  margin:80px auto;
+}
+
+.login button{
+  width:100%;
+  background:#111827;
+  color:white;
+  margin-top:15px;
+}
+
+.badge{
+  display:inline-block;
+  background:#e5e7eb;
+  padding:7px 12px;
+  border-radius:20px;
+  margin-top:10px;
+}
+
+.faq{
+  border:1px solid #ddd;
+  border-radius:12px;
+  padding:15px;
+  margin-bottom:12px;
+}
+
+.small{
+  color:#666;
+  font-size:13px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div id="loginPage" class="login card">
+
+<h2>🔐 دخول إدارة علي</h2>
+
+<p>
+هذه الصفحة خاصة بإدارة معلومات وقوانين شركة الاتحاد.
+</p>
+
+<label>
+كلمة مرور الإدارة
+</label>
+
+<input
+  id="password"
+  type="password"
+  placeholder="اكتب كلمة المرور"
+/>
+
+<button onclick="login()">
+دخول
+</button>
+
+<p class="small">
+يجب إعداد ADMIN_PASSWORD في Render.
+</p>
+
+</div>
+
+
+<div id="app" style="display:none">
+
+<header>
+
+<h1>🤖 إدارة معرفة علي</h1>
+
+<p>
+شركة الاتحاد للصرافة والحوالات المالية – فرع الشعار
+</p>
+
+<div class="badge">
+قاعدة المعرفة الخاصة بالشركة
+</div>
+
+</header>
+
+
+<div class="container">
+
+<div id="status" class="status"></div>
+
+
+<!-- COMPANY -->
+
+<div class="card">
+
+<h2>🏢 معلومات الشركة</h2>
+
+<div class="grid">
+
+<div>
+
+<label>وصف الشركة</label>
+
+<textarea id="companyDescription"></textarea>
+
+</div>
+
+<div>
+
+<label>العنوان الرئيسي</label>
+
+<textarea id="companyAddress"></textarea>
+
+</div>
+
+<div>
+
+<label>رقم الهاتف</label>
+
+<input id="companyPhone">
+
+</div>
+
+<div>
+
+<label>واتساب</label>
+
+<input id="companyWhatsapp">
+
+</div>
+
+<div>
+
+<label>تلغرام</label>
+
+<input id="companyTelegram">
+
+</div>
+
+<div>
+
+<label>ملاحظات</label>
+
+<textarea id="companyNotes"></textarea>
+
+</div>
+
+</div>
+
+</div>
+
+
+<!-- BRANCHES -->
+
+<div class="card">
+
+<h2>📍 الفروع</h2>
+
+<div id="branches"></div>
+
+<button class="add" onclick="addBranch()">
+➕ إضافة فرع
+</button>
+
+</div>
+
+
+<!-- SERVICES -->
+
+<div class="card">
+
+<h2>💼 الخدمات</h2>
+
+<div id="services"></div>
+
+<button class="add" onclick="addTextItem('services')">
+➕ إضافة خدمة
+</button>
+
+</div>
+
+
+<!-- EXCHANGE -->
+
+<div class="card">
+
+<h2>💱 قوانين الصرافة</h2>
+
+<p class="small">
+اكتب القوانين التي يجب على علي الالتزام بها عند الحديث عن الصرافة والأسعار.
+</p>
+
+<div id="exchangeRules"></div>
+
+<button class="add" onclick="addTextItem('exchangeRules')">
+➕ إضافة قانون
+</button>
+
+</div>
+
+
+<!-- TRANSFERS -->
+
+<div class="card">
+
+<h2>💸 قوانين الحوالات</h2>
+
+<p class="small">
+هنا تكتب كل ما يجب أن يعرفه علي عن الحوالات.
+</p>
+
+<div id="transferRules"></div>
+
+<button class="add" onclick="addTextItem('transferRules')">
+➕ إضافة قانون
+</button>
+
+</div>
+
+
+<!-- CUSTOMER -->
+
+<div class="card">
+
+<h2>👨‍💼 قواعد التعامل مع العملاء</h2>
+
+<div id="customerRules"></div>
+
+<button class="add" onclick="addTextItem('customerRules')">
+➕ إضافة قاعدة
+</button>
+
+</div>
+
+
+<!-- FORBIDDEN -->
+
+<div class="card">
+
+<h2>🚫 الممنوعات</h2>
+
+<p class="small">
+الأشياء التي يجب على علي عدم فعلها أو قولها.
+</p>
+
+<div id="forbiddenRules"></div>
+
+<button class="add" onclick="addTextItem('forbiddenRules')">
+➕ إضافة ممنوع
+</button>
+
+</div>
+
+
+<!-- FAQ -->
+
+<div class="card">
+
+<h2>❓ الأسئلة والأجوبة</h2>
+
+<p class="small">
+أضف الأسئلة التي يكثر سؤال العملاء عنها مع الجواب الرسمي.
+</p>
+
+<div id="faq"></div>
+
+<button class="add" onclick="addFAQ()">
+➕ إضافة سؤال وجواب
+</button>
+
+</div>
+
+
+<!-- GENERAL -->
+
+<div class="card">
+
+<h2>🧠 التعليمات العامة لعلي</h2>
+
+<div id="generalInstructions"></div>
+
+<button class="add" onclick="addTextItem('generalInstructions')">
+➕ إضافة تعليمات
+</button>
+
+</div>
+
+
+<!-- CUSTOM -->
+
+<div class="card">
+
+<h2>📝 معلومات إضافية</h2>
+
+<p class="small">
+اكتب هنا أي معلومات خاصة بالشركة تريد أن يعرفها علي.
+يمكنك الكتابة بحرية.
+</p>
+
+<textarea
+  id="customKnowledge"
+  style="min-height:250px"
+  placeholder="مثال:
+إذا سأل العميل عن...
+يجب على علي أن...
+عند حدوث...
+"
+></textarea>
+
+</div>
+
+
+<button
+  class="save"
+  onclick="saveAll()"
+>
+💾 حفظ كل معلومات الشركة
+</button>
+
+</div>
+
+</div>
+
+
+<script>
+
+let PASSWORD = "";
+
+let data = {
+  companyInfo:{},
+  branches:[],
+  services:[],
+  exchangeRules:[],
+  transferRules:[],
+  customerRules:[],
+  forbiddenRules:[],
+  faq:[],
+  generalInstructions:[],
+  customKnowledge:""
+};
+
+
+// ============================================================
+// LOGIN
+// ============================================================
+
+function login(){
+
+  const value =
+    document
+      .getElementById("password")
+      .value
+      .trim();
+
+  if(!value){
+
+    showStatus(
+      "اكتب كلمة المرور أولاً.",
+      false
+    );
+
+    return;
+  }
+
+  PASSWORD = value;
+
+  loadData();
+
+}
+
+
+// ============================================================
+// STATUS
+// ============================================================
+
+function showStatus(
+  message,
+  success=true
+){
+
+  const el =
+    document.getElementById(
+      "status"
+    );
+
+  el.textContent =
+    message;
+
+  el.className =
+    "status " +
+    (success
+      ? "success"
+      : "error");
+
+  el.style.display =
+    "block";
+
+  window.scrollTo({
+    top:0,
+    behavior:"smooth"
+  });
+
+}
+
+
+// ============================================================
+// LOAD
+// ============================================================
+
+async function loadData(){
+
+  try{
+
+    const response =
+      await fetch(
+        "/api/knowledge"
+      );
+
+    if(!response.ok){
+
+      throw new Error(
+        "تعذر تحميل البيانات"
+      );
+
+    }
+
+    const result =
+      await response.json();
+
+    data =
+      result.knowledge || data;
+
+    document
+      .getElementById(
+        "loginPage"
+      )
+      .style.display =
+      "none";
+
+    document
+      .getElementById(
+        "app"
+      )
+      .style.display =
+      "block";
+
+    render();
+
+  }catch(error){
+
+    showStatus(
+      "تعذر الدخول. تأكد من كلمة مرور الإدارة.",
+      false
+    );
+
+  }
+
+}
+
+
+// ============================================================
+// RENDER
+// ============================================================
+
+function render(){
+
+  const c =
+    data.companyInfo || {};
+
+  document
+    .getElementById(
+      "companyDescription"
+    ).value =
+    c.description || "";
+
+  document
+    .getElementById(
+      "companyAddress"
+    ).value =
+    c.address || "";
+
+  document
+    .getElementById(
+      "companyPhone"
+    ).value =
+    c.phone || "";
+
+  document
+    .getElementById(
+      "companyWhatsapp"
+    ).value =
+    c.whatsapp || "";
+
+  document
+    .getElementById(
+      "companyTelegram"
+    ).value =
+    c.telegram || "";
+
+  document
+    .getElementById(
+      "companyNotes"
+    ).value =
+    c.notes || "";
+
+
+  renderBranches();
+
+  renderTextList(
+    "services",
+    data.services
+  );
+
+  renderTextList(
+    "exchangeRules",
+    data.exchangeRules
+  );
+
+  renderTextList(
+    "transferRules",
+    data.transferRules
+  );
+
+  renderTextList(
+    "customerRules",
+    data.customerRules
+  );
+
+  renderTextList(
+    "forbiddenRules",
+    data.forbiddenRules
+  );
+
+  renderFAQ();
+
+  renderTextList(
+    "generalInstructions",
+    data.generalInstructions
+  );
+
+  document
+    .getElementById(
+      "customKnowledge"
+    ).value =
+    data.customKnowledge || "";
+
+}
+
+
+// ============================================================
+// BRANCHES
+// ============================================================
+
+function renderBranches(){
+
+  const box =
+    document.getElementById(
+      "branches"
+    );
+
+  box.innerHTML = "";
+
+  (data.branches || [])
+    .forEach(
+      (branch,index)=>{
+
+        const div =
+          document.createElement(
+            "div"
+          );
+
+        div.className =
+          "item";
+
+        div.innerHTML = `
+
+<div class="grid">
+
+<div>
+<label>اسم الفرع</label>
+<input
+ value="${escapeHtml(branch.name || "")}"
+ data-field="name"
+ data-index="${index}"
+>
+</div>
+
+<div>
+<label>العنوان</label>
+<textarea
+ data-field="address"
+ data-index="${index}"
+>${escapeHtml(branch.address || "")}</textarea>
+</div>
+
+<div>
+<label>الدوام</label>
+<input
+ value="${escapeHtml(branch.workingHours || "")}"
+ data-field="workingHours"
+ data-index="${index}"
+>
+</div>
+
+</div>
+
+<button
+ class="delete"
+ onclick="deleteBranch(${index})"
+>
+🗑️ حذف الفرع
+</button>
+
+`;
+
+        box.appendChild(div);
+
+      }
+    );
+
+  box
+    .querySelectorAll(
+      "[data-field]"
+    )
+    .forEach(
+      input=>{
+
+        input.addEventListener(
+          "input",
+          e=>{
+
+            const index =
+              Number(
+                e.target
+                  .dataset
+                  .index
+              );
+
+            const field =
+              e.target
+                .dataset
+                .field;
+
+            data.branches[index][field] =
+              e.target.value;
+
+          }
+        );
+
+      }
+    );
+
+}
+
+
+function addBranch(){
+
+  data.branches.push({
+
+    name:"",
+
+    address:"",
+
+    workingHours:""
+
+  });
+
+  renderBranches();
+
+}
+
+
+function deleteBranch(index){
+
+  data.branches.splice(
+    index,
+    1
+  );
+
+  renderBranches();
+
+}
+
+
+// ============================================================
+// TEXT LISTS
+// ============================================================
+
+function renderTextList(
+  id,
+  array
+){
+
+  const box =
+    document.getElementById(
+      id
+    );
+
+  box.innerHTML = "";
+
+  (array || [])
+    .forEach(
+      (value,index)=>{
+
+        const div =
+          document.createElement(
+            "div"
+          );
+
+        div.className =
+          "item-row";
+
+        div.innerHTML = `
+
+<textarea
+>${escapeHtml(value || "")}</textarea>
+
+<button
+ class="delete"
+>
+🗑️
+</button>
+
+`;
+
+        const textarea =
+          div.querySelector(
+            "textarea"
+          );
+
+        textarea.addEventListener(
+          "input",
+          ()=>{
+            data[id][index] =
+              textarea.value;
+          }
+        );
+
+        div
+          .querySelector(
+            "button"
+          )
+          .addEventListener(
+            "click",
+            ()=>{
+              data[id].splice(
+                index,
+                1
+              );
+
+              renderTextList(
+                id,
+                data[id]
+              );
+            }
+          );
+
+        box.appendChild(div);
+
+      }
+    );
+
+}
+
+
+function addTextItem(id){
+
+  if(!Array.isArray(data[id])){
+    data[id] = [];
+  }
+
+  data[id].push("");
+
+  renderTextList(
+    id,
+    data[id]
+  );
+
+}
+
+
+// ============================================================
+// FAQ
+// ============================================================
+
+function renderFAQ(){
+
+  const box =
+    document.getElementById(
+      "faq"
+    );
+
+  box.innerHTML = "";
+
+  (data.faq || [])
+    .forEach(
+      (item,index)=>{
+
+        const div =
+          document.createElement(
+            "div"
+          );
+
+        div.className =
+          "faq";
+
+        div.innerHTML = `
+
+<label>السؤال</label>
+
+<input
+ class="question"
+ value="${escapeHtml(item.question || "")}"
+>
+
+<label>الجواب الرسمي</label>
+
+<textarea
+ class="answer"
+>${escapeHtml(item.answer || "")}</textarea>
+
+<br>
+
+<button
+ class="delete"
+>
+🗑️ حذف
+</button>
+
+`;
+
+        const question =
+          div.querySelector(
+            ".question"
+          );
+
+        const answer =
+          div.querySelector(
+            ".answer"
+          );
+
+        question.addEventListener(
+          "input",
+          ()=>{
+            data.faq[index].question =
+              question.value;
+          }
+        );
+
+        answer.addEventListener(
+          "input",
+          ()=>{
+            data.faq[index].answer =
+              answer.value;
+          }
+        );
+
+        div
+          .querySelector(
+            "button"
+          )
+          .addEventListener(
+            "click",
+            ()=>{
+              data.faq.splice(
+                index,
+                1
+              );
+
+              renderFAQ();
+            }
+          );
+
+        box.appendChild(div);
+
+      }
+    );
+
+}
+
+
+function addFAQ(){
+
+  data.faq.push({
+
+    question:"",
+
+    answer:""
+
+  });
+
+  renderFAQ();
+
+}
+
+
+// ============================================================
+// SAVE
+// ============================================================
+
+async function saveAll(){
+
+  data.companyInfo = {
+
+    description:
+      document
+        .getElementById(
+          "companyDescription"
+        ).value,
+
+    address:
+      document
+        .getElementById(
+          "companyAddress"
+        ).value,
+
+    phone:
+      document
+        .getElementById(
+          "companyPhone"
+        ).value,
+
+    whatsapp:
+      document
+        .getElementById(
+          "companyWhatsapp"
+        ).value,
+
+    telegram:
+      document
+        .getElementById(
+          "companyTelegram"
+        ).value,
+
+    notes:
+      document
+        .getElementById(
+          "companyNotes"
+        ).value
+
+  };
+
+  data.customKnowledge =
+    document
+      .getElementById(
+        "customKnowledge"
+      ).value;
+
+
+  try{
+
+    const response =
+      await fetch(
+        "/api/knowledge",
+        {
+          method:"POST",
+
+          headers:{
+            "Content-Type":
+              "application/json",
+
+            "x-admin-password":
+              PASSWORD
+          },
+
+          body:
+            JSON.stringify({
+              knowledge:data
+            })
+        }
+      );
+
+    const result =
+      await response.json();
+
+    if(
+      !response.ok ||
+      !result.success
+    ){
+
+      throw new Error(
+        result.error ||
+        "فشل الحفظ"
+      );
+
+    }
+
+    data =
+      result.knowledge;
+
+    showStatus(
+      "✅ تم حفظ معلومات وقوانين الشركة. علي سيستخدمها الآن.",
+      true
+    );
+
+  }catch(error){
+
+    showStatus(
+      "❌ فشل الحفظ: " +
+      error.message,
+      false
+    );
+
+  }
+
+}
+
+
+// ============================================================
+// ESCAPE
+// ============================================================
+
+function escapeHtml(
+  value
+){
+
+  return String(value || "")
+    .replace(
+      /&/g,
+      "&amp;"
+    )
+    .replace(
+      /</g,
+      "&lt;"
+    )
+    .replace(
+      />/g,
+      "&gt;"
+    )
+    .replace(
+      /"/g,
+      "&quot;"
+    );
+
+}
+
+</script>
+
+</body>
+
+</html>
