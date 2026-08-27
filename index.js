@@ -27,7 +27,10 @@ const app = express();
 const PORT = process.env.PORT || 10000;
 
 app.use(express.json({ limit: "20mb" }));
-app.use(express.urlencoded({ extended: true, limit: "20mb" }));
+app.use(express.urlencoded({
+  extended: true,
+  limit: "20mb"
+}));
 
 // ============================================================
 // BASIC CONFIG
@@ -56,11 +59,22 @@ const TIMEZONE =
   "Asia/Damascus";
 
 // ============================================================
+// GLOBAL STATE
+// ============================================================
+
+let lastMessage = null;
+let lastAIResponse = null;
+let lastError = null;
+
+// ============================================================
 // KNOWLEDGE BASE
 // ============================================================
 
 const KNOWLEDGE_FILE =
-  path.join(__dirname, "company-knowledge.json");
+  path.join(
+    __dirname,
+    "company-knowledge.json"
+  );
 
 function defaultKnowledge() {
   return {
@@ -98,23 +112,30 @@ function defaultKnowledge() {
 function loadKnowledge() {
   try {
     if (!fs.existsSync(KNOWLEDGE_FILE)) {
-      const initial = defaultKnowledge();
+      const initial =
+        defaultKnowledge();
 
       fs.writeFileSync(
         KNOWLEDGE_FILE,
-        JSON.stringify(initial, null, 2),
+        JSON.stringify(
+          initial,
+          null,
+          2
+        ),
         "utf8"
       );
 
       return initial;
     }
 
-    const data = fs.readFileSync(
-      KNOWLEDGE_FILE,
-      "utf8"
-    );
+    const data =
+      fs.readFileSync(
+        KNOWLEDGE_FILE,
+        "utf8"
+      );
 
-    const parsed = JSON.parse(data);
+    const parsed =
+      JSON.parse(data);
 
     return {
       ...defaultKnowledge(),
@@ -130,14 +151,16 @@ function loadKnowledge() {
   }
 }
 
-let knowledge = loadKnowledge();
+let knowledge =
+  loadKnowledge();
 
 function saveKnowledge(data) {
   try {
     knowledge = {
       ...defaultKnowledge(),
       ...data,
-      lastUpdated: new Date().toISOString()
+      lastUpdated:
+        new Date().toISOString()
     };
 
     fs.writeFileSync(
@@ -152,7 +175,8 @@ function saveKnowledge(data) {
 
     return true;
   } catch (error) {
-    lastError = error.message;
+    lastError =
+      error.message;
 
     console.log(
       "❌ Knowledge save error:",
@@ -176,9 +200,11 @@ let gemini = null;
 
 if (GEMINI_API_KEY) {
   try {
-    gemini = new GoogleGenAI({
-      apiKey: GEMINI_API_KEY
-    });
+    gemini =
+      new GoogleGenAI({
+        apiKey:
+          GEMINI_API_KEY
+      });
 
     console.log(
       "🧠 Gemini AI: ENABLED"
@@ -196,7 +222,7 @@ if (GEMINI_API_KEY) {
 }
 
 // ============================================================
-// WHATSAPP
+// WHATSAPP CONNECTION
 // ============================================================
 
 const AUTH_DIR =
@@ -206,37 +232,73 @@ const AUTH_DIR =
   );
 
 let sock = null;
+
 let currentQR = null;
+
 let whatsappConnected = false;
+
 let startingWhatsApp = false;
+
 let reconnectTimer = null;
 
-let lastMessage = null;
-let lastAIResponse = null;
-let lastError = null;
+let reconnectAttempts = 0;
 
-const processedMessages = new Set();
-const MAX_PROCESSED_MESSAGES = 500;
+let connectionStartedAt = null;
+
+let lastConnectionOpenAt = null;
+
+let lastConnectionCloseAt = null;
+
+let currentSocketId = 0;
+
+let loggedOut = false;
+
+// ============================================================
+// RECONNECT SETTINGS
+// ============================================================
+
+const RECONNECT_MIN_DELAY =
+  5000;
+
+const RECONNECT_MAX_DELAY =
+  120000;
+
+const WATCHDOG_INTERVAL =
+  30000;
 
 // ============================================================
 // MEMORY
 // ============================================================
 
-const conversations = new Map();
+const conversations =
+  new Map();
 
 const MAX_MEMORY_MESSAGES =
-  config?.memory?.maxContextMessages || 30;
+  config?.memory
+    ?.maxContextMessages ||
+  30;
 
 function getConversation(jid) {
-  if (!conversations.has(jid)) {
-    conversations.set(jid, []);
+  if (
+    !conversations.has(jid)
+  ) {
+    conversations.set(
+      jid,
+      []
+    );
   }
 
   return conversations.get(jid);
 }
 
-function addMemory(jid, role, content) {
-  if (!config?.memory?.enabled) {
+function addMemory(
+  jid,
+  role,
+  content
+) {
+  if (
+    !config?.memory?.enabled
+  ) {
     return;
   }
 
@@ -246,7 +308,8 @@ function addMemory(jid, role, content) {
   memory.push({
     role,
     content,
-    time: new Date().toISOString()
+    time:
+      new Date().toISOString()
   });
 
   while (
@@ -266,13 +329,15 @@ function clearConversation(jid) {
 // ============================================================
 
 function getSyriaDateTime() {
-  const now = new Date();
+  const now =
+    new Date();
 
   const date =
     new Intl.DateTimeFormat(
       "ar-SY",
       {
-        timeZone: TIMEZONE,
+        timeZone:
+          TIMEZONE,
         year: "numeric",
         month: "2-digit",
         day: "2-digit"
@@ -283,7 +348,8 @@ function getSyriaDateTime() {
     new Intl.DateTimeFormat(
       "ar-SY",
       {
-        timeZone: TIMEZONE,
+        timeZone:
+          TIMEZONE,
         hour: "2-digit",
         minute: "2-digit",
         second: "2-digit",
@@ -295,7 +361,8 @@ function getSyriaDateTime() {
     new Intl.DateTimeFormat(
       "ar-SY",
       {
-        timeZone: TIMEZONE,
+        timeZone:
+          TIMEZONE,
         weekday: "long"
       }
     ).format(now);
@@ -304,70 +371,97 @@ function getSyriaDateTime() {
     date,
     time,
     weekday,
-    iso: now.toISOString()
+    iso:
+      now.toISOString()
   };
 }
 
 function getCurrentDayKey() {
-  const now = new Date();
+  const now =
+    new Date();
 
   const parts =
     new Intl.DateTimeFormat(
       "en-US",
       {
-        timeZone: TIMEZONE,
-        weekday: "long"
+        timeZone:
+          TIMEZONE,
+        weekday:
+          "long"
       }
     ).formatToParts(now);
 
   return (
     parts.find(
-      p => p.type === "weekday"
-    )?.value?.toLowerCase() || ""
+      p =>
+        p.type ===
+        "weekday"
+    )?.value
+      ?.toLowerCase() || ""
   );
 }
 
 function getCurrentTimeMinutes() {
-  const now = new Date();
+  const now =
+    new Date();
 
   const parts =
     new Intl.DateTimeFormat(
       "en-US",
       {
-        timeZone: TIMEZONE,
-        hour: "2-digit",
-        minute: "2-digit",
+        timeZone:
+          TIMEZONE,
+        hour:
+          "2-digit",
+        minute:
+          "2-digit",
         hour12: false
       }
     ).formatToParts(now);
 
-  const hour = Number(
-    parts.find(
-      p => p.type === "hour"
-    )?.value || 0
-  );
+  const hour =
+    Number(
+      parts.find(
+        p =>
+          p.type ===
+          "hour"
+      )?.value || 0
+    );
 
-  const minute = Number(
-    parts.find(
-      p => p.type === "minute"
-    )?.value || 0
-  );
+  const minute =
+    Number(
+      parts.find(
+        p =>
+          p.type ===
+          "minute"
+      )?.value || 0
+    );
 
-  return hour * 60 + minute;
+  return (
+    hour * 60 +
+    minute
+  );
 }
 
 function timeToMinutes(value) {
-  if (!value) return null;
+  if (!value) {
+    return null;
+  }
 
   const parts =
     String(value).split(":");
 
-  if (parts.length !== 2) {
+  if (
+    parts.length !== 2
+  ) {
     return null;
   }
 
-  const hour = Number(parts[0]);
-  const minute = Number(parts[1]);
+  const hour =
+    Number(parts[0]);
+
+  const minute =
+    Number(parts[1]);
 
   if (
     Number.isNaN(hour) ||
@@ -376,14 +470,19 @@ function timeToMinutes(value) {
     return null;
   }
 
-  return hour * 60 + minute;
+  return (
+    hour * 60 +
+    minute
+  );
 }
 
 function isWithinWorkingHours() {
-  const day = getCurrentDayKey();
+  const day =
+    getCurrentDayKey();
 
   const dayConfig =
-    config?.workingHours?.days?.[day];
+    config?.workingHours
+      ?.days?.[day];
 
   if (
     !dayConfig ||
@@ -393,10 +492,14 @@ function isWithinWorkingHours() {
   }
 
   const from =
-    timeToMinutes(dayConfig.from);
+    timeToMinutes(
+      dayConfig.from
+    );
 
   const to =
-    timeToMinutes(dayConfig.to);
+    timeToMinutes(
+      dayConfig.to
+    );
 
   if (
     from === null ||
@@ -420,7 +523,8 @@ function isWithinWorkingHours() {
 
 function getCompanyInfo() {
   return {
-    name: COMPANY_NAME,
+    name:
+      COMPANY_NAME,
 
     fullName:
       COMPANY_FULL_NAME,
@@ -452,46 +556,59 @@ function getCompanyInfo() {
 
 function getDynamicInstructions() {
   if (
-    !config?.dynamicInstructions?.enabled
+    !config?.dynamicInstructions
+      ?.enabled
   ) {
     return [];
   }
 
   const permanent =
     Array.isArray(
-      config.dynamicInstructions.instructions
+      config
+        .dynamicInstructions
+        .instructions
     )
-      ? config.dynamicInstructions.instructions
+      ? config
+          .dynamicInstructions
+          .instructions
       : [];
 
   const temporary =
     Array.isArray(
-      config.dynamicInstructions
+      config
+        .dynamicInstructions
         .temporaryInstructions
     )
-      ? config.dynamicInstructions
+      ? config
+          .dynamicInstructions
           .temporaryInstructions
       : [];
 
   const disabled =
     Array.isArray(
-      config.dynamicInstructions
+      config
+        .dynamicInstructions
         .disabledInstructions
     )
-      ? config.dynamicInstructions
+      ? config
+          .dynamicInstructions
           .disabledInstructions
       : [];
 
   const disabledSet =
     new Set(
-      disabled.map(x => String(x))
+      disabled.map(
+        x => String(x)
+      )
     );
 
   return [
     ...permanent,
     ...temporary
   ]
-    .map(x => String(x))
+    .map(
+      x => String(x)
+    )
     .filter(
       x =>
         x.trim() &&
@@ -504,7 +621,9 @@ function getDynamicInstructions() {
 // ============================================================
 
 function cleanText(text) {
-  if (!text) return "";
+  if (!text) {
+    return "";
+  }
 
   return String(text)
     .replace(/\u200e/g, "")
@@ -523,7 +642,9 @@ function cleanText(text) {
 // ============================================================
 
 function normalizePhone(value) {
-  if (!value) return "";
+  if (!value) {
+    return "";
+  }
 
   return String(value)
     .replace(
@@ -546,22 +667,28 @@ function normalizePhone(value) {
 
 function getAllowedUsers() {
   const users =
-    config?.permissions?.allowedUsers;
+    config?.permissions
+      ?.allowedUsers;
 
   return Array.isArray(users)
     ? users
-        .map(x => String(x).trim())
+        .map(
+          x => String(x).trim()
+        )
         .filter(Boolean)
     : [];
 }
 
 function getAllowedGroups() {
   const groups =
-    config?.permissions?.allowedGroups;
+    config?.permissions
+      ?.allowedGroups;
 
   return Array.isArray(groups)
     ? groups
-        .map(x => String(x).trim())
+        .map(
+          x => String(x).trim()
+        )
         .filter(Boolean)
     : [];
 }
@@ -577,15 +704,17 @@ function isAllowedUser(jid) {
   const number =
     normalizePhone(jid);
 
-  return users.some(user => {
-    const normalized =
-      normalizePhone(user);
+  return users.some(
+    user => {
+      const normalized =
+        normalizePhone(user);
 
-    return (
-      String(jid) === user ||
-      number === normalized
-    );
-  });
+      return (
+        String(jid) === user ||
+        number === normalized
+      );
+    }
+  );
 }
 
 function isAllowedGroup(jid) {
@@ -623,7 +752,8 @@ function isMessageAllowed(
 
 function isAdminJid(jid) {
   const admins =
-    process.env.ADMIN_NUMBERS || "";
+    process.env.ADMIN_NUMBERS ||
+    "";
 
   if (!admins.trim()) {
     return false;
@@ -632,7 +762,10 @@ function isAdminJid(jid) {
   const list =
     admins
       .split(",")
-      .map(x => normalizePhone(x))
+      .map(
+        x =>
+          normalizePhone(x)
+      )
       .filter(Boolean);
 
   return list.includes(
@@ -671,23 +804,37 @@ function updateDynamicInstruction(
     return false;
   }
 
-  if (!config.dynamicInstructions) {
-    config.dynamicInstructions = {};
+  if (
+    !config.dynamicInstructions
+  ) {
+    config.dynamicInstructions =
+      {};
   }
 
   if (
     !Array.isArray(
-      config.dynamicInstructions.instructions
+      config
+        .dynamicInstructions
+        .instructions
     )
   ) {
-    config.dynamicInstructions.instructions = [];
+    config
+      .dynamicInstructions
+      .instructions = [];
   }
 
-  config.dynamicInstructions.instructions.push(
-    String(instruction).trim()
-  );
+  config
+    .dynamicInstructions
+    .instructions
+    .push(
+      String(
+        instruction
+      ).trim()
+    );
 
-  config.dynamicInstructions.lastUpdated =
+  config
+    .dynamicInstructions
+    .lastUpdated =
     new Date().toISOString();
 
   return saveConfig();
@@ -698,10 +845,12 @@ function removeDynamicInstruction(
 ) {
   const list =
     Array.isArray(
-      config?.dynamicInstructions
+      config
+        ?.dynamicInstructions
         ?.instructions
     )
-      ? config.dynamicInstructions
+      ? config
+          .dynamicInstructions
           .instructions
       : [];
 
@@ -709,16 +858,23 @@ function removeDynamicInstruction(
     list.findIndex(
       item =>
         String(item).trim() ===
-        String(instruction).trim()
+        String(
+          instruction
+        ).trim()
     );
 
   if (index === -1) {
     return false;
   }
 
-  list.splice(index, 1);
+  list.splice(
+    index,
+    1
+  );
 
-  config.dynamicInstructions.lastUpdated =
+  config
+    .dynamicInstructions
+    .lastUpdated =
     new Date().toISOString();
 
   return saveConfig();
@@ -736,17 +892,30 @@ async function handleAdminCommand(
     return false;
   }
 
-  const value = cleanText(text);
-  const lower = value.toLowerCase();
+  const value =
+    cleanText(text);
+
+  const lower =
+    value.toLowerCase();
 
   if (
-    lower.startsWith("/تعليمات ") ||
-    lower.startsWith("/instruction ")
+    lower.startsWith(
+      "/تعليمات "
+    ) ||
+    lower.startsWith(
+      "/instruction "
+    )
   ) {
     const instruction =
       value
-        .replace(/^\/تعليمات\s*/i, "")
-        .replace(/^\/instruction\s*/i, "")
+        .replace(
+          /^\/تعليمات\s*/i,
+          ""
+        )
+        .replace(
+          /^\/instruction\s*/i,
+          ""
+        )
         .trim();
 
     if (!instruction) {
@@ -754,6 +923,7 @@ async function handleAdminCommand(
         jid,
         "اكتب التعليمة بعد الأمر."
       );
+
       return true;
     }
 
@@ -773,13 +943,23 @@ async function handleAdminCommand(
   }
 
   if (
-    lower.startsWith("/حذف ") ||
-    lower.startsWith("/remove ")
+    lower.startsWith(
+      "/حذف "
+    ) ||
+    lower.startsWith(
+      "/remove "
+    )
   ) {
     const instruction =
       value
-        .replace(/^\/حذف\s*/i, "")
-        .replace(/^\/remove\s*/i, "")
+        .replace(
+          /^\/حذف\s*/i,
+          ""
+        )
+        .replace(
+          /^\/remove\s*/i,
+          ""
+        )
         .trim();
 
     const removed =
@@ -860,10 +1040,15 @@ async function handleAdminCommand(
 الوقت: ${dt.time}
 التاريخ: ${dt.date}
 
+محاولات إعادة الاتصال:
+${reconnectAttempts}
+
 قاعدة معرفة الشركة:
-${knowledge.lastUpdated
-  ? "محدثة 🟢"
-  : "فارغة ⚠️"}`
+${
+  knowledge.lastUpdated
+    ? "محدثة 🟢"
+    : "فارغة ⚠️"
+}`
     );
 
     return true;
@@ -876,10 +1061,15 @@ ${knowledge.lastUpdated
 // MESSAGE TYPE
 // ============================================================
 
-function getMessageType(message) {
-  const m = message?.message;
+function getMessageType(
+  message
+) {
+  const m =
+    message?.message;
 
-  if (!m) return "unknown";
+  if (!m) {
+    return "unknown";
+  }
 
   if (
     m.conversation ||
@@ -888,20 +1078,42 @@ function getMessageType(message) {
     return "text";
   }
 
-  if (m.imageMessage) return "image";
-  if (m.audioMessage) return "audio";
-  if (m.videoMessage) return "video";
-  if (m.documentMessage) return "document";
-  if (m.stickerMessage) return "sticker";
-  if (m.locationMessage) return "location";
+  if (m.imageMessage) {
+    return "image";
+  }
+
+  if (m.audioMessage) {
+    return "audio";
+  }
+
+  if (m.videoMessage) {
+    return "video";
+  }
+
+  if (m.documentMessage) {
+    return "document";
+  }
+
+  if (m.stickerMessage) {
+    return "sticker";
+  }
+
+  if (m.locationMessage) {
+    return "location";
+  }
 
   return "unknown";
 }
 
-function extractMessageText(message) {
-  const m = message?.message;
+function extractMessageText(
+  message
+) {
+  const m =
+    message?.message;
 
-  if (!m) return "";
+  if (!m) {
+    return "";
+  }
 
   if (m.conversation) {
     return cleanText(
@@ -910,20 +1122,26 @@ function extractMessageText(message) {
   }
 
   if (
-    m.extendedTextMessage?.text
+    m.extendedTextMessage
+      ?.text
   ) {
     return cleanText(
-      m.extendedTextMessage.text
+      m.extendedTextMessage
+        .text
     );
   }
 
-  if (m.imageMessage?.caption) {
+  if (
+    m.imageMessage?.caption
+  ) {
     return cleanText(
       m.imageMessage.caption
     );
   }
 
-  if (m.videoMessage?.caption) {
+  if (
+    m.videoMessage?.caption
+  ) {
     return cleanText(
       m.videoMessage.caption
     );
@@ -940,10 +1158,15 @@ function extractMessageText(message) {
   return "";
 }
 
-function getMediaInfo(message) {
-  const m = message?.message;
+function getMediaInfo(
+  message
+) {
+  const m =
+    message?.message;
 
-  if (!m) return null;
+  if (!m) {
+    return null;
+  }
 
   if (m.imageMessage) {
     return {
@@ -966,7 +1189,8 @@ function getMediaInfo(message) {
         m.audioMessage.mimetype ||
         "audio/ogg",
       seconds:
-        m.audioMessage.seconds || 0,
+        m.audioMessage.seconds ||
+        0,
       ptt:
         !!m.audioMessage.ptt
     };
@@ -979,8 +1203,12 @@ function getMediaInfo(message) {
 // GROUP MENTION
 // ============================================================
 
-function isBotMentioned(message) {
-  if (!sock) return false;
+function isBotMentioned(
+  message
+) {
+  if (!sock) {
+    return false;
+  }
 
   const botNumber =
     normalizePhone(
@@ -1001,15 +1229,19 @@ function isBotMentioned(message) {
       ?.contextInfo
   ];
 
-  for (const context of contexts) {
+  for (
+    const context of contexts
+  ) {
     const mentioned =
-      context?.mentionedJid || [];
+      context?.mentionedJid ||
+      [];
 
     if (
       mentioned.some(
         jid =>
-          normalizePhone(jid) ===
-          botNumber
+          normalizePhone(
+            jid
+          ) === botNumber
       )
     ) {
       return true;
@@ -1024,7 +1256,8 @@ function isBotMentioned(message) {
 // ============================================================
 
 function knowledgeToText() {
-  const k = knowledge;
+  const k =
+    knowledge;
 
   let text = "";
 
@@ -1036,7 +1269,8 @@ function knowledgeToText() {
 
   if (
     k.companyInfo &&
-    typeof k.companyInfo === "object"
+    typeof k.companyInfo ===
+      "object"
   ) {
     text += `
 معلومات الشركة:
@@ -1048,7 +1282,11 @@ ${JSON.stringify(
 `;
   }
 
-  if (Array.isArray(k.branches)) {
+  if (
+    Array.isArray(
+      k.branches
+    )
+  ) {
     text += `
 الفروع:
 ${k.branches
@@ -1060,7 +1298,11 @@ ${k.branches
 `;
   }
 
-  if (Array.isArray(k.services)) {
+  if (
+    Array.isArray(
+      k.services
+    )
+  ) {
     text += `
 الخدمات:
 ${k.services
@@ -1072,7 +1314,11 @@ ${k.services
 `;
   }
 
-  if (Array.isArray(k.exchangeRules)) {
+  if (
+    Array.isArray(
+      k.exchangeRules
+    )
+  ) {
     text += `
 قوانين الصرافة:
 ${k.exchangeRules
@@ -1084,7 +1330,11 @@ ${k.exchangeRules
 `;
   }
 
-  if (Array.isArray(k.transferRules)) {
+  if (
+    Array.isArray(
+      k.transferRules
+    )
+  ) {
     text += `
 قوانين الحوالات:
 ${k.transferRules
@@ -1096,7 +1346,11 @@ ${k.transferRules
 `;
   }
 
-  if (Array.isArray(k.customerRules)) {
+  if (
+    Array.isArray(
+      k.customerRules
+    )
+  ) {
     text += `
 قواعد التعامل مع العملاء:
 ${k.customerRules
@@ -1108,7 +1362,11 @@ ${k.customerRules
 `;
   }
 
-  if (Array.isArray(k.forbiddenRules)) {
+  if (
+    Array.isArray(
+      k.forbiddenRules
+    )
+  ) {
     text += `
 الممنوعات:
 ${k.forbiddenRules
@@ -1120,7 +1378,11 @@ ${k.forbiddenRules
 `;
   }
 
-  if (Array.isArray(k.faq)) {
+  if (
+    Array.isArray(
+      k.faq
+    )
+  ) {
     text += `
 الأسئلة والأجوبة المعتمدة:
 ${k.faq
@@ -1167,7 +1429,9 @@ ${k.customKnowledge}
 // SYSTEM PROMPT
 // ============================================================
 
-function buildSystemPrompt(context = {}) {
+function buildSystemPrompt(
+  context = {}
+) {
   const dt =
     getSyriaDateTime();
 
@@ -1185,11 +1449,14 @@ function buildSystemPrompt(context = {}) {
 
   const currentDayConfig =
     config?.workingHours
-      ?.days?.[currentDay] || null;
+      ?.days?.[currentDay] ||
+    null;
 
   const services =
     company.services.length
-      ? company.services.join("، ")
+      ? company.services.join(
+          "، "
+        )
       : "غير محددة حالياً";
 
   const branchText =
@@ -1355,16 +1622,6 @@ ${JSON.stringify(
 قاعدة المعرفة الرسمية للشركة
 ==================================================
 
-المعلومات التالية صادرة من إدارة الشركة.
-
-اعتبرها المرجع الأساسي عندما يكون السؤال متعلقاً بالشركة.
-
-إذا وجدت معلومة هنا:
-استخدمها.
-
-إذا لم تجدها:
-لا تخترعها.
-
 ${knowledgeToText()}
 
 ==================================================
@@ -1423,7 +1680,9 @@ ${memoryText}
 // GEMINI RESPONSE
 // ============================================================
 
-function extractGeminiText(response) {
+function extractGeminiText(
+  response
+) {
   if (
     typeof response?.text ===
     "string"
@@ -1447,10 +1706,14 @@ function extractGeminiText(response) {
     response?.candidates?.[0]
       ?.content?.parts;
 
-  if (Array.isArray(parts)) {
+  if (
+    Array.isArray(parts)
+  ) {
     return cleanText(
       parts
-        .map(p => p.text || "")
+        .map(
+          p => p.text || ""
+        )
         .join("")
     );
   }
@@ -1471,7 +1734,8 @@ async function askGeminiText(
   }
 
   const jid =
-    context.sender || "unknown";
+    context.sender ||
+    "unknown";
 
   const memory =
     getConversation(jid);
@@ -1512,13 +1776,16 @@ ${userText}
         {
           model:
             "gemini-2.5-flash",
+
           contents:
             prompt
         }
       );
 
     return (
-      extractGeminiText(response) ||
+      extractGeminiText(
+        response
+      ) ||
       "عذراً، لم أتمكن من توليد إجابة حالياً."
     );
   } catch (error) {
@@ -1598,7 +1865,8 @@ ${userQuestion || "حلل الصورة."}
 
               parts: [
                 {
-                  text: prompt
+                  text:
+                    prompt
                 },
 
                 {
@@ -1606,7 +1874,9 @@ ${userQuestion || "حلل الصورة."}
                     mimeType:
                       mimeType ||
                       "image/jpeg",
-                    data: base64
+
+                    data:
+                      base64
                   }
                 }
               ]
@@ -1616,7 +1886,9 @@ ${userQuestion || "حلل الصورة."}
       );
 
     return (
-      extractGeminiText(response) ||
+      extractGeminiText(
+        response
+      ) ||
       "تم استلام الصورة، لكن لم أتمكن من تحليلها حالياً."
     );
   } catch (error) {
@@ -1678,7 +1950,8 @@ ${buildSystemPrompt({
 
 ${
   userText
-    ? `التعليق المرافق:\n${userText}`
+    ? `التعليق المرافق:
+${userText}`
     : ""
 }
 `;
@@ -1695,7 +1968,8 @@ ${
 
               parts: [
                 {
-                  text: prompt
+                  text:
+                    prompt
                 },
 
                 {
@@ -1703,7 +1977,9 @@ ${
                     mimeType:
                       mimeType ||
                       "audio/ogg",
-                    data: base64
+
+                    data:
+                      base64
                   }
                 }
               ]
@@ -1713,7 +1989,9 @@ ${
       );
 
     return (
-      extractGeminiText(response) ||
+      extractGeminiText(
+        response
+      ) ||
       "وصلني التسجيل الصوتي، لكن لم أتمكن من فهمه حالياً."
     );
   } catch (error) {
@@ -1744,7 +2022,9 @@ async function sendText(
     );
   }
 
-  if (!whatsappConnected) {
+  if (
+    !whatsappConnected
+  ) {
     throw new Error(
       "WhatsApp is not connected"
     );
@@ -1753,7 +2033,8 @@ async function sendText(
   return sock.sendMessage(
     jid,
     {
-      text: String(text)
+      text:
+        String(text)
     }
   );
 }
@@ -1761,6 +2042,12 @@ async function sendText(
 async function downloadMedia(
   message
 ) {
+  if (!sock) {
+    throw new Error(
+      "WhatsApp socket unavailable"
+    );
+  }
+
   return downloadMediaMessage(
     message,
     "buffer",
@@ -1768,7 +2055,8 @@ async function downloadMedia(
     {
       logger:
         P({
-          level: "silent"
+          level:
+            "silent"
         }),
 
       reuploadRequest:
@@ -1781,13 +2069,23 @@ async function downloadMedia(
 // MESSAGE HANDLER
 // ============================================================
 
+const processedMessages =
+  new Set();
+
+const MAX_PROCESSED_MESSAGES =
+  500;
+
 async function handleIncomingMessage(
   message
 ) {
   try {
-    if (!message) return;
+    if (!message) {
+      return;
+    }
 
-    if (message.key?.fromMe) {
+    if (
+      message.key?.fromMe
+    ) {
       return;
     }
 
@@ -1826,13 +2124,19 @@ async function handleIncomingMessage(
     }
 
     const jid =
-      message.key?.remoteJid;
+      message.key
+        ?.remoteJid;
 
-    if (!jid) return;
+    if (!jid) {
+      return;
+    }
 
     if (
-      jid === "status@broadcast" ||
-      jid.endsWith("@broadcast")
+      jid ===
+        "status@broadcast" ||
+      jid.endsWith(
+        "@broadcast"
+      )
     ) {
       return;
     }
@@ -1841,7 +2145,9 @@ async function handleIncomingMessage(
       isGroupJid(jid);
 
     const type =
-      getMessageType(message);
+      getMessageType(
+        message
+      );
 
     const text =
       extractMessageText(
@@ -1849,7 +2155,9 @@ async function handleIncomingMessage(
       );
 
     const mediaInfo =
-      getMediaInfo(message);
+      getMediaInfo(
+        message
+      );
 
     console.log(
       "\n======================================"
@@ -1871,7 +2179,12 @@ async function handleIncomingMessage(
 
     console.log(
       "Text:",
-      text || "(no text)"
+      text ||
+        "(no text)"
+    );
+
+    console.log(
+      "======================================"
     );
 
     // ADMIN
@@ -1895,6 +2208,7 @@ async function handleIncomingMessage(
       console.log(
         "⛔ Message blocked"
       );
+
       return;
     }
 
@@ -1912,7 +2226,9 @@ async function handleIncomingMessage(
 
       if (
         mentionOnly &&
-        !isBotMentioned(message)
+        !isBotMentioned(
+          message
+        )
       ) {
         return;
       }
@@ -1920,7 +2236,8 @@ async function handleIncomingMessage(
 
     lastMessage = {
       id:
-        message.key?.id || null,
+        message.key?.id ||
+        null,
 
       jid,
 
@@ -1946,8 +2263,10 @@ async function handleIncomingMessage(
           .trim();
 
       if (
-        normalized === "ping" ||
-        normalized === "بنغ"
+        normalized ===
+          "ping" ||
+        normalized ===
+          "بنغ"
       ) {
         await sendText(
           jid,
@@ -1959,7 +2278,9 @@ async function handleIncomingMessage(
 
       if (
         /^(وقت|الوقت|كم الساعة|شو الساعة|الساعة)$/
-          .test(normalized)
+          .test(
+            normalized
+          )
       ) {
         const dt =
           getSyriaDateTime();
@@ -1974,7 +2295,9 @@ async function handleIncomingMessage(
 
       if (
         /^(التاريخ|شو التاريخ|تاريخ اليوم)$/
-          .test(normalized)
+          .test(
+            normalized
+          )
       ) {
         const dt =
           getSyriaDateTime();
@@ -1997,7 +2320,9 @@ async function handleIncomingMessage(
         await askGeminiText(
           text,
           {
-            sender: jid,
+            sender:
+              jid,
+
             isGroup
           }
         );
@@ -2009,9 +2334,14 @@ async function handleIncomingMessage(
       );
 
       lastAIResponse = {
-        type: "text",
-        question: text,
+        type:
+          "text",
+
+        question:
+          text,
+
         answer,
+
         sentAt:
           new Date().toISOString()
       };
@@ -2029,7 +2359,9 @@ async function handleIncomingMessage(
     }
 
     // IMAGE
-    if (type === "image") {
+    if (
+      type === "image"
+    ) {
       try {
         const buffer =
           await downloadMedia(
@@ -2049,11 +2381,17 @@ async function handleIncomingMessage(
         const answer =
           await askGeminiImage(
             buffer,
-            mediaInfo?.mimeType ||
+
+            mediaInfo
+              ?.mimeType ||
               "image/jpeg",
+
             question,
+
             {
-              sender: jid,
+              sender:
+                jid,
+
               isGroup
             }
           );
@@ -2065,9 +2403,13 @@ async function handleIncomingMessage(
         );
 
         lastAIResponse = {
-          type: "image",
+          type:
+            "image",
+
           question,
+
           answer,
+
           sentAt:
             new Date().toISOString()
         };
@@ -2092,7 +2434,9 @@ async function handleIncomingMessage(
     }
 
     // AUDIO
-    if (type === "audio") {
+    if (
+      type === "audio"
+    ) {
       try {
         const buffer =
           await downloadMedia(
@@ -2108,11 +2452,17 @@ async function handleIncomingMessage(
         const answer =
           await askGeminiAudio(
             buffer,
-            mediaInfo?.mimeType ||
+
+            mediaInfo
+              ?.mimeType ||
               "audio/ogg",
+
             text,
+
             {
-              sender: jid,
+              sender:
+                jid,
+
               isGroup
             }
           );
@@ -2124,10 +2474,14 @@ async function handleIncomingMessage(
         );
 
         lastAIResponse = {
-          type: "audio",
+          type:
+            "audio",
+
           question:
             "رسالة صوتية",
+
           answer,
+
           sentAt:
             new Date().toISOString()
         };
@@ -2151,35 +2505,47 @@ async function handleIncomingMessage(
       return;
     }
 
-    if (type === "video") {
+    if (
+      type === "video"
+    ) {
       await sendText(
         jid,
         "وصلني الفيديو 🎥 حالياً أقدر أتعامل مباشرة مع النصوص والصور والتسجيلات الصوتية."
       );
+
       return;
     }
 
-    if (type === "document") {
+    if (
+      type === "document"
+    ) {
       await sendText(
         jid,
         "وصلني الملف 📄 حالياً تحليل الملفات يحتاج إلى دعم إضافي."
       );
+
       return;
     }
 
-    if (type === "sticker") {
+    if (
+      type === "sticker"
+    ) {
       await sendText(
         jid,
         "وصلتني الملصقة 😄"
       );
+
       return;
     }
 
-    if (type === "location") {
+    if (
+      type === "location"
+    ) {
       await sendText(
         jid,
         "وصلني الموقع 📍"
       );
+
       return;
     }
   } catch (error) {
@@ -2194,7 +2560,8 @@ async function handleIncomingMessage(
 
     try {
       if (
-        message?.key?.remoteJid
+        message?.key
+          ?.remoteJid
       ) {
         await sendText(
           message.key.remoteJid,
@@ -2206,15 +2573,182 @@ async function handleIncomingMessage(
 }
 
 // ============================================================
+// CONNECTION HELPERS
+// ============================================================
+
+function calculateReconnectDelay() {
+  const exponent =
+    Math.min(
+      reconnectAttempts,
+      5
+    );
+
+  const delay =
+    RECONNECT_MIN_DELAY *
+    Math.pow(
+      2,
+      exponent
+    );
+
+  const jitter =
+    Math.floor(
+      Math.random() * 3000
+    );
+
+  return Math.min(
+    delay + jitter,
+    RECONNECT_MAX_DELAY
+  );
+}
+
+function clearReconnectTimer() {
+  if (
+    reconnectTimer
+  ) {
+    clearTimeout(
+      reconnectTimer
+    );
+
+    reconnectTimer =
+      null;
+  }
+}
+
+function scheduleReconnect(
+  reason = "unknown"
+) {
+  if (loggedOut) {
+    console.log(
+      "⛔ Reconnect disabled because WhatsApp was logged out."
+    );
+
+    return;
+  }
+
+  if (
+    reconnectTimer
+  ) {
+    console.log(
+      "⏳ Reconnect already scheduled."
+    );
+
+    return;
+  }
+
+  reconnectAttempts++;
+
+  const delay =
+    calculateReconnectDelay();
+
+  console.log(
+    `🔄 Reconnect scheduled in ${Math.round(
+      delay / 1000
+    )}s | attempt ${reconnectAttempts} | reason: ${reason}`
+  );
+
+  reconnectTimer =
+    setTimeout(
+      async () => {
+        reconnectTimer =
+          null;
+
+        await startWhatsApp();
+      },
+      delay
+    );
+}
+
+function resetReconnectState() {
+  reconnectAttempts = 0;
+}
+
+function isLoggedOutCode(
+  statusCode
+) {
+  return (
+    statusCode ===
+      DisconnectReason.loggedOut ||
+    statusCode === 401
+  );
+}
+
+function shouldReconnect(
+  statusCode
+) {
+  if (
+    isLoggedOutCode(
+      statusCode
+    )
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function safelyCloseSocket(
+  targetSocket
+) {
+  try {
+    if (
+      targetSocket &&
+      typeof targetSocket.end ===
+        "function"
+    ) {
+      targetSocket.end(
+        undefined
+      );
+    }
+  } catch (error) {
+    console.log(
+      "⚠️ Socket close error:",
+      error.message
+    );
+  }
+}
+
+// ============================================================
 // START WHATSAPP
 // ============================================================
 
 async function startWhatsApp() {
-  if (startingWhatsApp) {
+  if (
+    startingWhatsApp
+  ) {
+    console.log(
+      "⏳ WhatsApp startup already running."
+    );
+
     return;
   }
 
-  startingWhatsApp = true;
+  if (
+    whatsappConnected &&
+    sock
+  ) {
+    console.log(
+      "🟢 WhatsApp already connected."
+    );
+
+    return;
+  }
+
+  if (loggedOut) {
+    console.log(
+      "⛔ WhatsApp session logged out. QR/manual relink required."
+    );
+
+    return;
+  }
+
+  startingWhatsApp =
+    true;
+
+  const socketId =
+    ++currentSocketId;
+
+  connectionStartedAt =
+    new Date().toISOString();
 
   try {
     console.log(
@@ -2226,15 +2760,34 @@ async function startWhatsApp() {
     );
 
     console.log(
+      "🔢 Socket ID:",
+      socketId
+    );
+
+    console.log(
+      "🔄 Reconnect attempt:",
+      reconnectAttempts
+    );
+
+    console.log(
       "======================================"
     );
 
-    if (!fs.existsSync(AUTH_DIR)) {
+    if (
+      !fs.existsSync(
+        AUTH_DIR
+      )
+    ) {
       fs.mkdirSync(
         AUTH_DIR,
         {
-          recursive: true
+          recursive:
+            true
         }
+      );
+
+      console.log(
+        "📁 Created auth directory."
       );
     }
 
@@ -2246,13 +2799,16 @@ async function startWhatsApp() {
         AUTH_DIR
       );
 
-    let version = null;
+    let version =
+      null;
 
     try {
       const latest =
         await fetchLatestBaileysVersion();
 
-      if (latest?.version) {
+      if (
+        latest?.version
+      ) {
         version =
           latest.version;
 
@@ -2269,11 +2825,13 @@ async function startWhatsApp() {
     }
 
     const options = {
-      auth: state,
+      auth:
+        state,
 
       logger:
         P({
-          level: "silent"
+          level:
+            "silent"
         }),
 
       browser:
@@ -2281,12 +2839,17 @@ async function startWhatsApp() {
           "Chrome"
         ),
 
-      printQRInTerminal: false,
+      printQRInTerminal:
+        false,
 
       generateHighQualityLinkPreview:
         false,
 
-      syncFullHistory: false
+      syncFullHistory:
+        false,
+
+      markOnlineOnConnect:
+        false
     };
 
     if (version) {
@@ -2294,37 +2857,70 @@ async function startWhatsApp() {
         version;
     }
 
-    sock =
+    const newSocket =
       makeWASocket(
         options
       );
 
-    sock.ev.on(
+    // مهم:
+    // نربط المتغير العام بهذا الـ socket فقط
+    // إذا لم يكن هناك socket أحدث منه.
+
+    sock =
+      newSocket;
+
+    newSocket.ev.on(
       "creds.update",
       saveCreds
     );
 
-    sock.ev.on(
+    newSocket.ev.on(
       "messages.upsert",
       async ({
         messages,
         type
       }) => {
-        if (type !== "notify") {
+        if (
+          type !==
+          "notify"
+        ) {
           return;
         }
 
-        for (const message of messages) {
-          await handleIncomingMessage(
-            message
-          );
+        for (
+          const message of
+            messages
+        ) {
+          try {
+            await handleIncomingMessage(
+              message
+            );
+          } catch (error) {
+            console.log(
+              "❌ Message event error:",
+              error.message
+            );
+          }
         }
       }
     );
 
-    sock.ev.on(
+    newSocket.ev.on(
       "connection.update",
       async update => {
+        // تجاهل أحداث Socket قديم
+        if (
+          socketId !==
+          currentSocketId
+        ) {
+          console.log(
+            "⚠️ Ignoring stale socket event:",
+            socketId
+          );
+
+          return;
+        }
+
         const {
           connection,
           lastDisconnect,
@@ -2332,8 +2928,11 @@ async function startWhatsApp() {
         } = update;
 
         if (qr) {
-          currentQR = qr;
-          whatsappConnected = false;
+          currentQR =
+            qr;
+
+          whatsappConnected =
+            false;
 
           console.log(
             "📱 QR READY - open /qr"
@@ -2341,12 +2940,40 @@ async function startWhatsApp() {
         }
 
         if (
-          connection === "open"
+          connection ===
+          "connecting"
         ) {
-          whatsappConnected = true;
-          currentQR = null;
-          lastError = null;
-          startingWhatsApp = false;
+          whatsappConnected =
+            false;
+
+          console.log(
+            "🟡 WhatsApp connecting..."
+          );
+        }
+
+        if (
+          connection ===
+          "open"
+        ) {
+          whatsappConnected =
+            true;
+
+          currentQR =
+            null;
+
+          startingWhatsApp =
+            false;
+
+          lastConnectionOpenAt =
+            new Date().toISOString();
+
+          lastConnectionCloseAt =
+            null;
+
+          lastError =
+            null;
+
+          resetReconnectState();
 
           console.log(
             "\n======================================"
@@ -2368,22 +2995,42 @@ async function startWhatsApp() {
 
           console.log(
             "📱 JID:",
-            sock?.user?.id ||
+            newSocket?.user
+              ?.id ||
               "unknown"
+          );
+
+          console.log(
+            "🔐 Session:",
+            fs.existsSync(
+              AUTH_DIR
+            )
+              ? "saved"
+              : "missing"
           );
 
           console.log(
             "======================================\n"
           );
+
+          return;
         }
 
         if (
-          connection === "close"
+          connection ===
+          "close"
         ) {
-          whatsappConnected = false;
-          startingWhatsApp = false;
+          whatsappConnected =
+            false;
 
-          let statusCode = null;
+          startingWhatsApp =
+            false;
+
+          lastConnectionCloseAt =
+            new Date().toISOString();
+
+          let statusCode =
+            null;
 
           try {
             statusCode =
@@ -2398,32 +3045,71 @@ async function startWhatsApp() {
           } catch (_) {}
 
           console.log(
-            "🔴 WhatsApp disconnected:",
+            "\n======================================"
+          );
+
+          console.log(
+            "🔴 WHATSAPP DISCONNECTED"
+          );
+
+          console.log(
+            "📛 Status code:",
             statusCode
           );
 
+          console.log(
+            "🔄 Reconnect:",
+            shouldReconnect(
+              statusCode
+            )
+              ? "YES"
+              : "NO"
+          );
+
+          console.log(
+            "======================================"
+          );
+
+          // هذا الـ socket لم يعد صالحاً
           if (
-            statusCode ===
-              DisconnectReason.loggedOut ||
-            statusCode === 401
+            sock ===
+            newSocket
           ) {
+            sock =
+              null;
+          }
+
+          currentQR =
+            null;
+
+          safelyCloseSocket(
+            newSocket
+          );
+
+          if (
+            isLoggedOutCode(
+              statusCode
+            )
+          ) {
+            loggedOut =
+              true;
+
             console.log(
               "🔴 WhatsApp logged out."
+            );
+
+            console.log(
+              "📱 احذف جلسة auth_info_baileys ثم اربط QR من جديد."
             );
 
             return;
           }
 
-          if (!reconnectTimer) {
-            reconnectTimer =
-              setTimeout(
-                async () => {
-                  reconnectTimer = null;
-                  await startWhatsApp();
-                },
-                5000
-              );
-          }
+          // أي انقطاع آخر:
+          // إعادة اتصال تلقائية.
+          scheduleReconnect(
+            `status ${statusCode || "unknown"}`
+          );
         }
       }
     );
@@ -2431,8 +3117,23 @@ async function startWhatsApp() {
     console.log(
       "✅ WhatsApp listeners ready"
     );
+
+    console.log(
+      "🔐 Auth directory:",
+      AUTH_DIR
+    );
   } catch (error) {
-    startingWhatsApp = false;
+    startingWhatsApp =
+      false;
+
+    whatsappConnected =
+      false;
+
+    if (
+      sock?.user?.id
+    ) {
+      // لا نفعل شيئاً
+    }
 
     lastError =
       error.message ||
@@ -2443,39 +3144,91 @@ async function startWhatsApp() {
       lastError
     );
 
-    if (!reconnectTimer) {
-      reconnectTimer =
-        setTimeout(
-          async () => {
-            reconnectTimer = null;
-            await startWhatsApp();
-          },
-          10000
-        );
-    }
+    scheduleReconnect(
+      "startup error"
+    );
   }
 }
+
+// ============================================================
+// WATCHDOG
+// ============================================================
+
+setInterval(
+  () => {
+    try {
+      if (
+        whatsappConnected &&
+        sock
+      ) {
+        return;
+      }
+
+      if (
+        startingWhatsApp
+      ) {
+        console.log(
+          "⏳ Watchdog: WhatsApp startup in progress."
+        );
+
+        return;
+      }
+
+      if (
+        loggedOut
+      ) {
+        return;
+      }
+
+      console.log(
+        "🐕 Watchdog: WhatsApp disconnected - checking reconnect..."
+      );
+
+      scheduleReconnect(
+        "watchdog"
+      );
+    } catch (error) {
+      lastError =
+        error.message ||
+        String(error);
+
+      console.log(
+        "❌ Watchdog error:",
+        lastError
+      );
+    }
+  },
+  WATCHDOG_INTERVAL
+);
 
 // ============================================================
 // ADMIN WEB PASSWORD
 // ============================================================
 
-function checkAdminPassword(req) {
+function checkAdminPassword(
+  req
+) {
   const password =
-    process.env.ADMIN_PASSWORD || "";
+    process.env
+      .ADMIN_PASSWORD ||
+    "";
 
   if (!password) {
     return false;
   }
 
   const supplied =
-    req.headers["x-admin-password"] ||
+    req.headers[
+      "x-admin-password"
+    ] ||
     req.body?.password ||
     req.query?.password ||
     "";
 
-  return String(supplied) ===
-    String(password);
+  return (
+    String(supplied) ===
+    String(password)
+  );
 }
 
 // ============================================================
@@ -2489,29 +3242,49 @@ app.get(
       getSyriaDateTime();
 
     res.json({
-      status: "online",
-      bot: BOT_NAME,
+      status:
+        "online",
+
+      bot:
+        BOT_NAME,
+
       role:
         config?.bot?.role ||
         "AI Employee",
-      enabled: BOT_ENABLED,
+
+      enabled:
+        BOT_ENABLED,
+
       company:
         COMPANY_FULL_NAME,
+
       branch:
         BRANCH_NAME,
+
       whatsapp:
         whatsappConnected
           ? "connected"
           : "disconnected",
+
       gemini:
         gemini
           ? "enabled"
           : "disabled",
-      time: dt.time,
-      date: dt.date,
-      weekday: dt.weekday,
+
+      reconnectAttempts,
+
+      time:
+        dt.time,
+
+      date:
+        dt.date,
+
+      weekday:
+        dt.weekday,
+
       workingNow:
         isWithinWorkingHours(),
+
       knowledge:
         knowledge.lastUpdated
           ? "loaded"
@@ -2528,11 +3301,18 @@ app.get(
   "/status",
   (req, res) => {
     res.json({
-      status: "online",
-      bot: BOT_NAME,
-      enabled: BOT_ENABLED,
+      status:
+        "online",
+
+      bot:
+        BOT_NAME,
+
+      enabled:
+        BOT_ENABLED,
+
       company:
         COMPANY_FULL_NAME,
+
       branch:
         BRANCH_NAME,
 
@@ -2545,7 +3325,23 @@ app.get(
           null,
 
         qrReady:
-          !!currentQR
+          !!currentQR,
+
+        socketId:
+          currentSocketId,
+
+        starting:
+          startingWhatsApp,
+
+        reconnectAttempts,
+
+        connectionStartedAt,
+
+        lastConnectionOpenAt,
+
+        lastConnectionCloseAt,
+
+        loggedOut
       },
 
       gemini: {
@@ -2611,7 +3407,9 @@ app.get(
   "/api/knowledge",
   (req, res) => {
     res.json({
-      success: true,
+      success:
+        true,
+
       knowledge
     });
   }
@@ -2620,11 +3418,17 @@ app.get(
 app.post(
   "/api/knowledge",
   (req, res) => {
-    if (!checkAdminPassword(req)) {
+    if (
+      !checkAdminPassword(
+        req
+      )
+    ) {
       return res
         .status(401)
         .json({
-          success: false,
+          success:
+            false,
+
           error:
             "Unauthorized"
         });
@@ -2637,17 +3441,23 @@ app.post(
       return res
         .status(400)
         .json({
-          success: false,
+          success:
+            false,
+
           error:
             "knowledge is required"
         });
     }
 
     const saved =
-      saveKnowledge(data);
+      saveKnowledge(
+        data
+      );
 
     res.json({
-      success: saved,
+      success:
+        saved,
+
       knowledge
     });
   }
@@ -2660,11 +3470,17 @@ app.post(
 app.post(
   "/api/knowledge/reset",
   (req, res) => {
-    if (!checkAdminPassword(req)) {
+    if (
+      !checkAdminPassword(
+        req
+      )
+    ) {
       return res
         .status(401)
         .json({
-          success: false,
+          success:
+            false,
+
           error:
             "Unauthorized"
         });
@@ -2676,7 +3492,9 @@ app.post(
       );
 
     res.json({
-      success: saved,
+      success:
+        saved,
+
       knowledge
     });
   }
@@ -2695,7 +3513,11 @@ app.get(
         "admin.html"
       );
 
-    if (!fs.existsSync(file)) {
+    if (
+      !fs.existsSync(
+        file
+      )
+    ) {
       return res
         .status(404)
         .send(
@@ -2703,7 +3525,9 @@ app.get(
         );
     }
 
-    res.sendFile(file);
+    res.sendFile(
+      file
+    );
   }
 );
 
@@ -2718,7 +3542,8 @@ app.get(
       enabled:
         config
           ?.dynamicInstructions
-          ?.enabled !== false,
+          ?.enabled !==
+        false,
 
       instructions:
         getDynamicInstructions(),
@@ -2744,7 +3569,9 @@ app.post(
       return res
         .status(400)
         .json({
-          success: false,
+          success:
+            false,
+
           error:
             "instruction is required"
         });
@@ -2756,8 +3583,11 @@ app.post(
       );
 
     res.json({
-      success: saved,
+      success:
+        saved,
+
       instruction,
+
       instructions:
         getDynamicInstructions()
     });
@@ -2772,7 +3602,9 @@ app.get(
   "/qr",
   async (req, res) => {
     try {
-      if (whatsappConnected) {
+      if (
+        whatsappConnected
+      ) {
         return res.send(`
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -2814,7 +3646,9 @@ font-weight:bold
 `);
       }
 
-      if (!currentQR) {
+      if (
+        !currentQR
+      ) {
         return res.send(`
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -2837,8 +3671,11 @@ font-weight:bold
         await QRCode.toDataURL(
           currentQR,
           {
-            width: 350,
-            margin: 2
+            width:
+              350,
+
+            margin:
+              2
           }
         );
 
@@ -2917,6 +3754,7 @@ border-radius:10px
         .json({
           error:
             "QR unavailable",
+
           message:
             lastError
         });
@@ -2942,17 +3780,26 @@ app.get(
           {
             sender:
               "web-test",
-            isGroup: false
+
+            isGroup:
+              false
           }
         );
 
       res.json({
-        success: true,
-        bot: BOT_NAME,
+        success:
+          true,
+
+        bot:
+          BOT_NAME,
+
         question,
+
         answer,
+
         gemini:
           !!gemini,
+
         time:
           getSyriaDateTime()
       });
@@ -2964,7 +3811,9 @@ app.get(
       res
         .status(500)
         .json({
-          success: false,
+          success:
+            false,
+
           error:
             lastError
         });
@@ -2983,13 +3832,19 @@ app.post(
       const {
         jid,
         message
-      } = req.body || {};
+      } =
+        req.body || {};
 
-      if (!jid || !message) {
+      if (
+        !jid ||
+        !message
+      ) {
         return res
           .status(400)
           .json({
-            success: false,
+            success:
+              false,
+
             error:
               "jid and message are required"
           });
@@ -3001,8 +3856,12 @@ app.post(
       );
 
       res.json({
-        success: true,
-        sentTo: jid,
+        success:
+          true,
+
+        sentTo:
+          jid,
+
         message
       });
     } catch (error) {
@@ -3013,7 +3872,9 @@ app.post(
       res
         .status(500)
         .json({
-          success: false,
+          success:
+            false,
+
           error:
             lastError
         });
@@ -3029,14 +3890,23 @@ app.get(
   "/ping",
   (req, res) => {
     res.json({
-      pong: true,
-      bot: BOT_NAME,
+      pong:
+        true,
+
+      bot:
+        BOT_NAME,
+
       whatsapp:
         whatsappConnected,
+
       gemini:
         !!gemini,
+
       knowledge:
         !!knowledge,
+
+      reconnectAttempts,
+
       time:
         new Date().toISOString()
     });
@@ -3044,7 +3914,7 @@ app.get(
 );
 
 // ============================================================
-// START
+// START SERVER
 // ============================================================
 
 app.listen(
@@ -3109,6 +3979,18 @@ app.listen(
     );
 
     console.log(
+      "🔄 Auto Reconnect: ENABLED"
+    );
+
+    console.log(
+      "🐕 Connection Watchdog: ENABLED"
+    );
+
+    console.log(
+      "💾 Persistent Auth: ENABLED"
+    );
+
+    console.log(
       "======================================"
     );
 
@@ -3151,7 +4033,10 @@ process.on(
       "❌ UNCAUGHT EXCEPTION:",
       error?.stack ||
         error
-    );
+      );
+
+    // لا نقتل السيرفر.
+    // Watchdog سيبقى فعالاً.
   }
 );
 
@@ -3174,14 +4059,23 @@ process.on(
 // SHUTDOWN
 // ============================================================
 
-async function shutdown(signal) {
+async function shutdown(
+  signal
+) {
   console.log(
     `\n🛑 Received ${signal}`
   );
 
   try {
+    clearReconnectTimer();
+
+    loggedOut =
+      true;
+
     if (sock) {
-      sock.end(undefined);
+      safelyCloseSocket(
+        sock
+      );
     }
   } catch (error) {
     console.log(
@@ -3195,10 +4089,16 @@ async function shutdown(signal) {
 
 process.on(
   "SIGTERM",
-  () => shutdown("SIGTERM")
+  () =>
+    shutdown(
+      "SIGTERM"
+    )
 );
 
 process.on(
   "SIGINT",
-  () => shutdown("SIGINT")
+  () =>
+    shutdown(
+      "SIGINT"
+    )
 );
