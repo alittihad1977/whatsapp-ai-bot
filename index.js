@@ -15,6 +15,7 @@ const {
 
 const P = require("pino");
 const QRCode = require("qrcode");
+const { getLatestPrices, buildPriceImage } = require("./price-image");
 const { GoogleGenAI } = require("@google/genai");
 
 const config = require("./config.json");
@@ -1000,6 +1001,24 @@ async function handleAdminCommand(
     return true;
   }
 
+  if (
+    lower === "/صورة الاسعار" ||
+    lower === "/صورة الأسعار" ||
+    lower === "/اسعار صورة" ||
+    lower === "/أسعار صورة"
+  ) {
+    try {
+      await sendText(jid, "⏳ عم حضّر صورة الأسعار الحالية...");
+      const latest = await getLatestPrices();
+      const image = await buildPriceImage(latest.prices);
+      await sock.sendMessage(jid, { image, mimetype: "image/png", caption: "💱 أسعار الصرف — شركة الاتحاد\n🕐 آخر تحديث: " + new Date().toLocaleString("ar-SY", { timeZone: "Asia/Damascus" }) });
+      console.log("✅ Price image sent");
+    } catch (error) {
+      console.log("❌ Price image error:", error.message);
+      await sendText(jid, "❌ ما قدرت أجهز صورة الأسعار حالياً.\n" + error.message);
+    }
+    return true;
+  }
   if (
     lower === "/مسح الذاكرة" ||
     lower === "/clear-memory"
